@@ -245,7 +245,7 @@ class Database:
             response = self.client.table('daily_pnl')\
                 .select('*')\
                 .eq('trade_date', trade_date.isoformat())\
-                .single()\
+                .maybeSingle()\
                 .execute()
             
             return response.data if response.data else None
@@ -367,8 +367,8 @@ class Database:
             
             daily_stats = response.data if response.data else []
             
-            # Performance por moeda
-            response = self.client.rpc('performance_by_symbol').execute()
+            # Performance por moeda (VIEW)
+            response = self.client.from_('performance_by_symbol').select('*').execute()
             performance = response.data if response.data else []
             
             # Calcular totais
