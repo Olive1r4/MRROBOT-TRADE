@@ -619,3 +619,5 @@ Desenvolvido com ❤️ para a comunidade de trading quantitativo.
 ```
 
 🤖 **Happy Trading!** 🚀
+
+<!-- Deploy automatizado testado em Mon Jan 19 17:40:52 -03 2026 -->
