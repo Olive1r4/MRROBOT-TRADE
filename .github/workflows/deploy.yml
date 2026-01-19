@@ -19,9 +19,10 @@ jobs:
       - name: 🔐 Configurar chave SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          ssh-add ~/.ssh/id_ed25519 2>/dev/null || true
       
       - name: 🚀 Deploy via SSH
         env:
@@ -29,7 +30,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PATH: ${{ secrets.VPS_PATH }}
         run: |
-          ssh $VPS_USER@$VPS_HOST << 'ENDSSH'
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST << 'ENDSSH'
             set -e
             
             echo "============================================"
@@ -38,10 +39,6 @@ jobs:
             
             # Navegar para o diretório do projeto
             cd ${{ secrets.VPS_PATH }}
-            
-            # Parar o serviço se estiver rodando
-            echo "⏸️  Parando serviço..."
-            sudo systemctl stop scalping-bot || echo "Serviço não estava rodando"
             
             # Fazer backup do arquivo .env
             if [ -f .env ]; then
@@ -60,29 +57,29 @@ jobs:
               mv .env.backup .env
             fi
             
-            # Ativar ambiente virtual
-            echo "🐍 Ativando ambiente virtual..."
-            source venv/bin/activate
+            # Parar containers
+            echo "⏸️  Parando containers..."
+            docker compose down || true
             
-            # Atualizar dependências
-            echo "📦 Instalando/atualizando dependências..."
-            pip install --upgrade pip
-            pip install -r requirements.txt
+            # Build nova imagem
+            echo "🔨 Construindo nova imagem..."
+            docker compose build --no-cache
             
-            # Criar diretório de logs se não existir
-            echo "📁 Criando diretório de logs..."
-            mkdir -p logs
+            # Iniciar containers
+            echo "🚀 Iniciando containers..."
+            docker compose up -d
             
-            # Reiniciar serviço
-            echo "🔄 Reiniciando serviço..."
-            sudo systemctl start scalping-bot
-            
-            # Aguardar um momento
-            sleep 3
+            # Aguardar inicialização
+            echo "⏳ Aguardando inicialização..."
+            sleep 15
             
             # Verificar status
-            echo "✅ Verificando status do serviço..."
-            sudo systemctl status scalping-bot --no-pager
+            echo "✅ Verificando status dos containers..."
+            docker compose ps
+            
+            # Exibir logs
+            echo "📋 Últimas linhas de log:"
+            docker compose logs --tail=20
             
             echo "============================================"
             echo "✅ DEPLOY CONCLUÍDO COM SUCESSO!"
