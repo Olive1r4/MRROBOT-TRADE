@@ -52,8 +52,8 @@ class Config(BaseSettings):
     
     # ALAVANCAGEM (conservadora para scalping)
     # Iniciantes: 3x-5x | Avançados: até 10x
-    DEFAULT_LEVERAGE: int = Field(default=3, description="Alavancagem padrão (3x conservador)")
-    MAX_LEVERAGE: int = Field(default=5, description="Alavancagem máxima permitida")
+    DEFAULT_LEVERAGE: int = Field(default=5, description="Alavancagem padrão (5x moderado)")
+    MAX_LEVERAGE: int = Field(default=10, description="Alavancagem máxima permitida")
     
     DEFAULT_POSITION_SIZE: float = Field(default=100.00, description="Tamanho padrão da posição em USDT")
     
