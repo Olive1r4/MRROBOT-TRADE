@@ -72,6 +72,12 @@ class Config(BaseSettings):
     MAX_ORDERS_PER_MINUTE: int = Field(default=5, description="Rate limit de ordens")
     
     # ============================================
+    # SCANNER DE MERCADO
+    # ============================================
+    ENABLE_SCANNER: bool = Field(default=True, description="Habilitar scanner automático de mercado")
+    SCANNER_CHECK_INTERVAL: int = Field(default=30, description="Intervalo entre verificações do scanner (segundos)")
+    
+    # ============================================
     # LOGGING
     # ============================================
     LOG_LEVEL: str = Field(default="INFO", description="Nível de log")
