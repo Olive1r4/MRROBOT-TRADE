@@ -24,12 +24,13 @@ CREATE INDEX idx_coins_config_symbol ON coins_config(symbol);
 CREATE INDEX idx_coins_config_active ON coins_config(is_active);
 
 -- Inserir algumas moedas populares como exemplo
+-- Alavancagem conservadora: 3x (iniciantes) a 5x (avançados)
 INSERT INTO coins_config (symbol, is_active, min_pnl, max_position_size, leverage) VALUES
-    ('BTCUSDT', true, 0.006, 500.00, 10),
-    ('ETHUSDT', true, 0.006, 300.00, 10),
-    ('BNBUSDT', true, 0.006, 200.00, 10),
-    ('SOLUSDT', true, 0.006, 150.00, 10),
-    ('ADAUSDT', false, 0.006, 100.00, 10)
+    ('BTCUSDT', true, 0.006, 500.00, 3),
+    ('ETHUSDT', true, 0.006, 300.00, 3),
+    ('BNBUSDT', true, 0.006, 200.00, 3),
+    ('SOLUSDT', true, 0.006, 150.00, 3),
+    ('ADAUSDT', false, 0.006, 100.00, 3)
 ON CONFLICT (symbol) DO NOTHING;
 
 -- ============================================

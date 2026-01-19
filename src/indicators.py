@@ -266,12 +266,41 @@ class SignalAnalyzer:
             else:
                 reasons.append(f"✅ RSI em sobrevenda")
             
-            # Calcular stop loss dinâmico baseado no ATR
-            stop_loss_distance = atr * self.config.ATR_MULTIPLIER
-            stop_loss = current_price - stop_loss_distance
+            # CALCULAR STOP LOSS (CRÍTICO - Risk:Reward 1:1 a 1:1.5)
+            if self.config.USE_ATR_STOP:
+                # Stop loss dinâmico baseado no ATR (volatilidade)
+                stop_loss_distance = atr * self.config.ATR_MULTIPLIER
+                stop_loss_percentage = stop_loss_distance / current_price
+                
+                # Limitar stop loss máximo a MAX_LOSS_PER_TRADE (0.9%)
+                if stop_loss_percentage > self.config.MAX_LOSS_PER_TRADE:
+                    logger.warning(f"⚠️ ATR stop ({stop_loss_percentage*100:.2f}%) excede máximo ({self.config.MAX_LOSS_PER_TRADE*100:.2f}%)")
+                    stop_loss_percentage = self.config.MAX_LOSS_PER_TRADE
+                    stop_loss_distance = current_price * stop_loss_percentage
+                
+                # Garantir stop mínimo de 0.3% (evitar stops muito apertados)
+                elif stop_loss_percentage < 0.003:
+                    logger.warning(f"⚠️ ATR stop ({stop_loss_percentage*100:.2f}%) muito apertado, usando 0.3% mínimo")
+                    stop_loss_percentage = 0.003
+                    stop_loss_distance = current_price * stop_loss_percentage
+                
+                stop_loss = current_price - stop_loss_distance
+                
+            else:
+                # Stop loss fixo
+                stop_loss_distance = current_price * self.config.STOP_LOSS_PERCENTAGE
+                stop_loss = current_price - stop_loss_distance
+                stop_loss_percentage = self.config.STOP_LOSS_PERCENTAGE
             
             # Calcular take profit baseado no alvo de lucro
             take_profit = current_price * (1 + self.config.TARGET_PROFIT + (self.config.TRADING_FEE * 2))
+            
+            # Calcular Risk:Reward Ratio
+            risk = stop_loss_distance / current_price
+            reward = (take_profit - current_price) / current_price
+            risk_reward_ratio = reward / risk if risk > 0 else 0
+            
+            logger.info(f"💹 Risk:Reward Ratio: 1:{risk_reward_ratio:.2f} (Risk: {risk*100:.2f}% | Reward: {reward*100:.2f}%)")
             
             reason_text = " | ".join(reasons)
             
@@ -283,7 +312,8 @@ class SignalAnalyzer:
             
             if should_enter:
                 logger.info(f"   🎯 Take Profit: {take_profit:.4f} (+{self.config.TARGET_PROFIT * 100:.2f}%)")
-                logger.info(f"   🛑 Stop Loss: {stop_loss:.4f} (-{(stop_loss_distance / current_price) * 100:.2f}%)")
+                logger.info(f"   🛑 Stop Loss: {stop_loss:.4f} (-{stop_loss_percentage * 100:.2f}%)")
+                logger.info(f"   ⚖️ Risk:Reward = 1:{risk_reward_ratio:.2f}")
             
             return {
                 'should_enter': should_enter,

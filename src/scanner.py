@@ -1,5 +1,5 @@
 """
-Scanner de mercado usando Binance WebSockets
+Scanner de mercado usando Binance WebSockets REAIS
 Monitora preços em tempo real e detecta oportunidades de scalping
 """
 import asyncio
@@ -8,13 +8,14 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import ccxt
+import websockets
 from collections import deque
 
 logger = logging.getLogger(__name__)
 
 
-class MarketScanner:
-    """Scanner de mercado em tempo real via Binance API"""
+class BinanceWebSocketScanner:
+    """Scanner de mercado em tempo real via Binance WebSockets"""
     
     def __init__(self, config, exchange_manager, risk_manager, database):
         self.config = config
@@ -22,24 +23,34 @@ class MarketScanner:
         self.risk_manager = risk_manager
         self.db = database
         
-        # Cache de velas para cada símbolo
+        # Cache de velas para cada símbolo (200 para calcular EMA 200)
         self.candles_cache: Dict[str, deque] = {}
         
         # Última vez que cada símbolo foi verificado
         self.last_check: Dict[str, datetime] = {}
         
-        # Intervalo mínimo entre verificações (evitar spam)
-        self.check_interval = timedelta(seconds=30)
+        # Intervalo mínimo entre verificações (evitar overtrading)
+        self.check_interval = timedelta(seconds=self.config.SCANNER_CHECK_INTERVAL)
         
         # Lista de símbolos ativos
         self.active_symbols: List[str] = []
         
-        logger.info("🔍 Market Scanner inicializado")
+        # WebSocket connections
+        self.websockets: Dict[str, websockets.WebSocketClientProtocol] = {}
+        
+        # Flag para saber se buffer inicial está completo
+        self.buffer_ready: Dict[str, bool] = {}
+        
+        # Reconnection attempts
+        self.reconnect_attempts: Dict[str, int] = {}
+        self.max_reconnect_attempts = 10
+        
+        logger.info("🔍 Binance WebSocket Scanner inicializado")
     
     async def start(self):
         """Inicia o scanner em background"""
         logger.info("=" * 60)
-        logger.info("🚀 INICIANDO MARKET SCANNER")
+        logger.info("🚀 INICIANDO BINANCE WEBSOCKET SCANNER")
         logger.info("=" * 60)
         
         # Buscar símbolos ativos do Supabase
@@ -49,18 +60,18 @@ class MarketScanner:
             logger.warning("⚠️ Nenhum símbolo ativo encontrado. Scanner pausado.")
             return
         
-        logger.info(f"📊 Monitorando {len(self.active_symbols)} símbolos:")
+        logger.info(f"📊 Monitorando {len(self.active_symbols)} símbolos via WebSocket:")
         for symbol in self.active_symbols:
             logger.info(f"   • {symbol}")
         
-        # Iniciar loops de monitoramento
+        # Iniciar loops de monitoramento para cada símbolo
         tasks = [
-            asyncio.create_task(self.monitor_symbol(symbol))
+            asyncio.create_task(self.monitor_symbol_websocket(symbol))
             for symbol in self.active_symbols
         ]
         
         # Aguardar todas as tasks
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks, return_exceptions=True)
     
     async def load_active_symbols(self):
         """Carrega lista de símbolos ativos do Supabase"""
@@ -78,47 +89,159 @@ class MarketScanner:
         except Exception as e:
             logger.error(f"❌ Erro ao carregar símbolos: {e}")
     
-    async def monitor_symbol(self, symbol: str):
-        """Monitora um símbolo específico continuamente"""
-        logger.info(f"👁️ Iniciando monitoramento de {symbol}")
-        
-        # Inicializar cache de velas
-        self.candles_cache[symbol] = deque(maxlen=200)  # Guardar últimas 200 velas
-        
-        while True:
-            try:
-                # Buscar velas recentes
-                await self.update_candles(symbol)
-                
-                # Verificar se deve analisar (respeitar intervalo)
-                if self.should_check(symbol):
-                    await self.analyze_symbol(symbol)
-                
-                # Aguardar antes da próxima iteração (atualização a cada 5 segundos)
-                await asyncio.sleep(5)
-                
-            except Exception as e:
-                logger.error(f"❌ Erro ao monitorar {symbol}: {e}")
-                await asyncio.sleep(10)  # Aguardar mais em caso de erro
-    
-    async def update_candles(self, symbol: str):
-        """Atualiza cache de velas de um símbolo"""
+    async def fill_initial_buffer(self, symbol: str):
+        """
+        CRITICAL: Preenche buffer inicial com 200 velas ANTES de começar a analisar
+        Necessário para calcular EMA 200 e outros indicadores
+        """
         try:
-            # Buscar últimas velas (5m timeframe para scalping)
+            logger.info(f"📥 Preenchendo buffer inicial de {symbol} (200 velas)...")
+            
+            # Buscar últimas 200 velas via REST API
             ohlcv = self.exchange.exchange.fetch_ohlcv(
-                symbol, 
+                symbol,
                 timeframe=self.config.TIMEFRAME,
                 limit=200
             )
             
-            # Atualizar cache
+            if len(ohlcv) < 100:
+                logger.error(f"❌ Dados insuficientes para {symbol}: apenas {len(ohlcv)} velas")
+                return False
+            
+            # Inicializar cache
             self.candles_cache[symbol] = deque(ohlcv, maxlen=200)
             
+            logger.info(f"✅ Buffer de {symbol} pronto com {len(ohlcv)} velas")
+            logger.info(f"   Primeira vela: {datetime.fromtimestamp(ohlcv[0][0]/1000).strftime('%Y-%m-%d %H:%M')}")
+            logger.info(f"   Última vela: {datetime.fromtimestamp(ohlcv[-1][0]/1000).strftime('%Y-%m-%d %H:%M')}")
+            
+            self.buffer_ready[symbol] = True
+            return True
+            
         except Exception as e:
-            logger.error(f"❌ Erro ao atualizar velas de {symbol}: {e}")
+            logger.error(f"❌ Erro ao preencher buffer de {symbol}: {e}")
+            self.buffer_ready[symbol] = False
+            return False
+    
+    async def monitor_symbol_websocket(self, symbol: str):
+        """
+        Monitora um símbolo via WebSocket com reconnection logic
+        """
+        # Converter símbolo para formato Binance WebSocket (BTCUSDT -> btcusdt)
+        ws_symbol = symbol.lower()
+        
+        # Preencher buffer inicial ANTES de conectar WebSocket
+        buffer_filled = await self.fill_initial_buffer(symbol)
+        
+        if not buffer_filled:
+            logger.error(f"❌ Não foi possível preencher buffer de {symbol}. Abortando.")
+            return
+        
+        self.reconnect_attempts[symbol] = 0
+        
+        while True:
+            try:
+                # URL do WebSocket da Binance (Kline/Candlestick)
+                ws_url = f"wss://stream.binance.com:9443/ws/{ws_symbol}@kline_{self.config.TIMEFRAME}"
+                
+                logger.info(f"🔌 Conectando WebSocket de {symbol}...")
+                
+                async with websockets.connect(
+                    ws_url,
+                    ping_interval=20,
+                    ping_timeout=10,
+                    close_timeout=5
+                ) as websocket:
+                    
+                    self.websockets[symbol] = websocket
+                    self.reconnect_attempts[symbol] = 0
+                    
+                    logger.info(f"✅ WebSocket de {symbol} conectado!")
+                    
+                    # Loop principal de recepção de dados
+                    async for message in websocket:
+                        try:
+                            data = json.loads(message)
+                            
+                            # Processar dados da vela
+                            if 'k' in data:
+                                kline = data['k']
+                                
+                                # Atualizar cache com nova vela
+                                await self.process_kline(symbol, kline)
+                                
+                        except json.JSONDecodeError as e:
+                            logger.error(f"❌ Erro ao decodificar JSON de {symbol}: {e}")
+                        except Exception as e:
+                            logger.error(f"❌ Erro ao processar mensagem de {symbol}: {e}")
+            
+            except websockets.exceptions.ConnectionClosed as e:
+                logger.warning(f"⚠️ WebSocket de {symbol} fechou: {e}")
+                await self.handle_reconnection(symbol)
+            
+            except Exception as e:
+                logger.error(f"❌ Erro no WebSocket de {symbol}: {e}")
+                await self.handle_reconnection(symbol)
+    
+    async def handle_reconnection(self, symbol: str):
+        """
+        CRITICAL: Lógica de reconnection automática
+        Reconecta em menos de 5 segundos
+        """
+        self.reconnect_attempts[symbol] += 1
+        
+        if self.reconnect_attempts[symbol] > self.max_reconnect_attempts:
+            logger.error(f"❌ {symbol}: Máximo de tentativas de reconnection atingido ({self.max_reconnect_attempts})")
+            logger.error(f"❌ Abortando monitoramento de {symbol}")
+            return
+        
+        # Backoff exponencial mas limitado a 5 segundos
+        wait_time = min(2 ** self.reconnect_attempts[symbol], 5)
+        
+        logger.warning(f"🔄 Tentativa {self.reconnect_attempts[symbol]}/{self.max_reconnect_attempts} de reconnection para {symbol}")
+        logger.warning(f"⏳ Aguardando {wait_time}s antes de reconectar...")
+        
+        await asyncio.sleep(wait_time)
+        
+        logger.info(f"🔌 Reconectando {symbol}...")
+    
+    async def process_kline(self, symbol: str, kline: dict):
+        """
+        Processa nova vela do WebSocket e atualiza cache
+        """
+        try:
+            # Extrair dados da vela
+            # [timestamp, open, high, low, close, volume]
+            candle = [
+                int(kline['t']),  # Timestamp
+                float(kline['o']),  # Open
+                float(kline['h']),  # High
+                float(kline['l']),  # Low
+                float(kline['c']),  # Close
+                float(kline['v'])   # Volume
+            ]
+            
+            # Verificar se é uma vela FECHADA (completa)
+            is_closed = kline['x']
+            
+            if is_closed:
+                # Vela fechou - adicionar ao cache
+                self.candles_cache[symbol].append(candle)
+                logger.debug(f"📊 {symbol}: Nova vela fechada @ ${candle[4]:.2f}")
+                
+                # Analisar símbolo se já passou o intervalo de check
+                if self.should_check(symbol):
+                    await self.analyze_symbol(symbol)
+            else:
+                # Vela ainda aberta - atualizar última vela do cache
+                if len(self.candles_cache[symbol]) > 0:
+                    self.candles_cache[symbol][-1] = candle
+                    
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar kline de {symbol}: {e}")
     
     def should_check(self, symbol: str) -> bool:
-        """Verifica se deve analisar o símbolo (respeitar intervalo)"""
+        """Verifica se deve analisar o símbolo (respeitar intervalo de SCANNER_CHECK_INTERVAL)"""
         now = datetime.now()
         
         if symbol not in self.last_check:
@@ -136,20 +259,31 @@ class MarketScanner:
     async def analyze_symbol(self, symbol: str):
         """Analisa um símbolo e detecta sinais de entrada"""
         try:
+            # Verificar se buffer está pronto
+            if not self.buffer_ready.get(symbol, False):
+                return
+            
             candles = list(self.candles_cache.get(symbol, []))
             
             if len(candles) < 100:
-                return  # Não há dados suficientes
+                logger.warning(f"⚠️ {symbol}: Buffer insuficiente ({len(candles)} velas)")
+                return
             
-            # Extrair preços
-            closes = [candle[4] for candle in candles]  # Close price
-            highs = [candle[2] for candle in candles]   # High
-            lows = [candle[3] for candle in candles]    # Low
-            volumes = [candle[5] for candle in candles] # Volume
+            # Extrair preços (OTIMIZADO - uma única iteração)
+            closes = []
+            highs = []
+            lows = []
+            volumes = []
+            
+            for candle in candles:
+                highs.append(candle[2])
+                lows.append(candle[3])
+                closes.append(candle[4])
+                volumes.append(candle[5])
             
             current_price = closes[-1]
             
-            # Calcular indicadores
+            # Calcular indicadores (OTIMIZADO)
             from src.indicators import (
                 calculate_rsi,
                 calculate_bollinger_bands,
@@ -165,12 +299,12 @@ class MarketScanner:
             # Calcular distância das bandas
             bb_distance = (current_price - bb_lower[-1]) / bb_lower[-1] * 100
             
-            # Volume médio
+            # Volume médio (últimas 20 velas)
             avg_volume = sum(volumes[-20:]) / 20
             current_volume = volumes[-1]
             volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
             
-            logger.debug(f"📊 {symbol} | Preço: ${current_price:.2f} | RSI: {rsi[-1]:.1f} | BB Dist: {bb_distance:.2f}% | Vol: {volume_ratio:.2f}x")
+            logger.debug(f"📊 {symbol} | ${current_price:.2f} | RSI: {rsi[-1]:.1f} | BB: {bb_distance:.2f}% | Vol: {volume_ratio:.2f}x")
             
             # DETECTAR SINAL DE COMPRA
             signal_detected = self.detect_buy_signal(
@@ -233,7 +367,7 @@ class MarketScanner:
             logger.info(f"🎯 SINAL DE COMPRA DETECTADO: {symbol}")
             logger.info("=" * 60)
             logger.info(f"💵 Preço: ${current_price:.2f}")
-            logger.info(f"📊 Condições atendidas: {met_conditions}/{total_conditions}")
+            logger.info(f"📊 Condições: {met_conditions}/{total_conditions}")
             for condition, met in conditions.items():
                 status = "✅" if met else "❌"
                 logger.info(f"   {status} {condition}")
@@ -263,8 +397,6 @@ class MarketScanner:
                     logger.warning(f"   • {reason}")
                 return
             
-            # Importar função de execução de trade do main
-            # (Isso será feito via chamada HTTP interna ou compartilhamento de função)
             logger.info(f"✅ Trade aprovado pelo risk manager")
             logger.info(f"📈 Executando trade de {symbol} via API interna...")
             
@@ -290,5 +422,5 @@ class MarketScanner:
 
 async def start_scanner(config, exchange_manager, risk_manager, database):
     """Função auxiliar para iniciar o scanner"""
-    scanner = MarketScanner(config, exchange_manager, risk_manager, database)
+    scanner = BinanceWebSocketScanner(config, exchange_manager, risk_manager, database)
     await scanner.start()

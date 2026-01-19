@@ -43,7 +43,18 @@ class Config(BaseSettings):
     # ============================================
     TARGET_PROFIT: float = Field(default=0.006, description="Lucro alvo (0.6%)")
     TRADING_FEE: float = Field(default=0.0004, description="Taxa de trading (0.04%)")
-    DEFAULT_LEVERAGE: int = Field(default=10, description="Alavancagem padrão")
+    
+    # STOP LOSS POR TRADE (CRÍTICO!)
+    # Risk:Reward deve ser próximo de 1:1 ou 1:1.5
+    # Com target de 0.6%, stop deve ser 0.6-0.9%
+    STOP_LOSS_PERCENTAGE: float = Field(default=0.008, description="Stop loss por trade (0.8%)")
+    MAX_LOSS_PER_TRADE: float = Field(default=0.009, description="Perda máxima por trade (0.9%)")
+    
+    # ALAVANCAGEM (conservadora para scalping)
+    # Iniciantes: 3x-5x | Avançados: até 10x
+    DEFAULT_LEVERAGE: int = Field(default=3, description="Alavancagem padrão (3x conservador)")
+    MAX_LEVERAGE: int = Field(default=5, description="Alavancagem máxima permitida")
+    
     DEFAULT_POSITION_SIZE: float = Field(default=100.00, description="Tamanho padrão da posição em USDT")
     
     # ============================================
@@ -59,7 +70,11 @@ class Config(BaseSettings):
     EMA_PERIOD: int = Field(default=200, description="Período da EMA")
     
     ATR_PERIOD: int = Field(default=14, description="Período do ATR")
-    ATR_MULTIPLIER: float = Field(default=1.5, description="Multiplicador do ATR para stop loss")
+    # ATR usado para stop loss dinâmico baseado em volatilidade
+    # Objetivo: stop entre 0.6-0.9% do preço de entrada
+    ATR_MULTIPLIER: float = Field(default=1.5, description="Multiplicador do ATR para stop loss dinâmico")
+    USE_ATR_STOP: bool = Field(default=True, description="Usar ATR para calcular stop loss (recomendado)")
+    USE_FIXED_STOP: bool = Field(default=False, description="Usar stop loss fixo de STOP_LOSS_PERCENTAGE")
     
     TIMEFRAME: str = Field(default="5m", description="Timeframe para análise")
     

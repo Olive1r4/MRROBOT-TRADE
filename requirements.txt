@@ -28,6 +28,9 @@ python-json-logger==2.0.7
 # Versão compatível com supabase 2.10.0
 httpx==0.27.2
 
+# WebSockets (para Binance real-time streaming)
+websockets==12.0
+
 # Utilities
 python-dateutil==2.8.2
 pytz==2024.1
