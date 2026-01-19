@@ -58,33 +58,33 @@ class Config(BaseSettings):
     DEFAULT_POSITION_SIZE: float = Field(default=100.00, description="Tamanho padrão da posição em USDT")
     
     # ============================================
-    # INDICADORES TÉCNICOS
+    # INDICADORES TÉCNICOS (OTIMIZADOS PARA 1 MINUTO)
     # ============================================
-    RSI_PERIOD: int = Field(default=14, description="Período do RSI")
-    RSI_OVERSOLD: float = Field(default=30, description="Nível de sobrevenda do RSI")
-    RSI_OVERBOUGHT: float = Field(default=70, description="Nível de sobrecompra do RSI")
+    RSI_PERIOD: int = Field(default=10, description="Período do RSI (reduzido para 1min)")
+    RSI_OVERSOLD: float = Field(default=25, description="Nível de sobrevenda do RSI (mais conservador)")
+    RSI_OVERBOUGHT: float = Field(default=75, description="Nível de sobrecompra do RSI")
     
-    BB_PERIOD: int = Field(default=20, description="Período das Bandas de Bollinger")
+    BB_PERIOD: int = Field(default=15, description="Período das Bandas de Bollinger (mais dinâmico)")
     BB_STD_DEV: float = Field(default=2.0, description="Desvio padrão das Bollinger")
     
-    EMA_PERIOD: int = Field(default=200, description="Período da EMA")
+    EMA_PERIOD: int = Field(default=100, description="Período da EMA (ajustado para 1min)")
     
-    ATR_PERIOD: int = Field(default=14, description="Período do ATR")
+    ATR_PERIOD: int = Field(default=10, description="Período do ATR (mais responsivo)")
     # ATR usado para stop loss dinâmico baseado em volatilidade
-    # Objetivo: stop entre 0.6-0.9% do preço de entrada
+    # Objetivo: stop entre 0.3-0.9% do preço de entrada
     ATR_MULTIPLIER: float = Field(default=1.5, description="Multiplicador do ATR para stop loss dinâmico")
     USE_ATR_STOP: bool = Field(default=True, description="Usar ATR para calcular stop loss (recomendado)")
     USE_FIXED_STOP: bool = Field(default=False, description="Usar stop loss fixo de STOP_LOSS_PERCENTAGE")
     
-    TIMEFRAME: str = Field(default="5m", description="Timeframe para análise")
+    TIMEFRAME: str = Field(default="1m", description="Timeframe para análise (SCALPING)")
     
     # ============================================
-    # GUARDRAILS DE SEGURANÇA
+    # GUARDRAILS DE SEGURANÇA (REFORÇADOS PARA 1 MINUTO)
     # ============================================
     DAILY_STOP_LOSS: float = Field(default=0.05, description="Stop loss diário (5%)")
-    MAX_OPEN_TRADES: int = Field(default=2, description="Máximo de trades abertos")
-    TRADE_COOLDOWN_SECONDS: int = Field(default=300, description="Cooldown entre trades (5min)")
-    MAX_ORDERS_PER_MINUTE: int = Field(default=5, description="Rate limit de ordens")
+    MAX_OPEN_TRADES: int = Field(default=1, description="Máximo de trades abertos (1 para evitar overtrading)")
+    TRADE_COOLDOWN_SECONDS: int = Field(default=180, description="Cooldown entre trades (3min)")
+    MAX_ORDERS_PER_MINUTE: int = Field(default=3, description="Rate limit de ordens (mais conservador)")
     
     # ============================================
     # SCANNER DE MERCADO
