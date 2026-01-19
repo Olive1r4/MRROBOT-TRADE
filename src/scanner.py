@@ -289,7 +289,7 @@ class BinanceWebSocketScanner:
             rsi = TechnicalIndicators.calculate_rsi(closes)
             bb_upper, bb_middle, bb_lower = TechnicalIndicators.calculate_bollinger_bands(closes)
             ema_200 = TechnicalIndicators.calculate_ema(closes, period=200)
-            atr = TechnicalIndicators.calculate_atr(candles_list)
+            atr = TechnicalIndicators.calculate_atr(candles)
             
             # Calcular distância das bandas
             bb_distance = (current_price - bb_lower[-1]) / bb_lower[-1] * 100
