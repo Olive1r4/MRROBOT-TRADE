@@ -19,13 +19,14 @@ jobs:
       - name: 🔐 Configurar chave SSH
         run: |
           mkdir -p ~/.ssh
-          # Salvar chave (garantindo formato correto)
-          printf "%s" "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          # Decodificar chave base64 e salvar
+          echo "${{ secrets.VPS_SSH_KEY_BASE64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           # Adicionar host aos known_hosts
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
           # Verificar se a chave está válida
-          ssh-keygen -l -f ~/.ssh/id_ed25519 || echo "⚠️ Aviso: formato de chave pode estar incorreto"
+          echo "✅ Verificando chave SSH..."
+          ssh-keygen -l -f ~/.ssh/id_ed25519
       
       - name: 🚀 Deploy via SSH
         env:
