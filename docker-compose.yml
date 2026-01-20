@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   scalping-bot:
@@ -7,30 +7,30 @@ services:
       dockerfile: Dockerfile
     container_name: mrrobot-scalping-bot
     restart: unless-stopped
-    
+
     # Variáveis de ambiente do arquivo .env
     env_file:
       - .env
-    
+
     # Portas
     ports:
       - "${WEBHOOK_PORT:-8000}:8000"
-    
+
     # Volumes para persistência
     volumes:
       # Logs persistentes
       - ./logs:/app/logs
-    
+
     # Recursos (ajuste conforme necessário)
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: "2"
           memory: 1G
         reservations:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 512M
-    
+
     # Health check
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -38,15 +38,26 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    
+
     # Logging
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    
+
     # Rede
+    networks:
+      - scalping-network
+
+  dozzle:
+    container_name: mrrobot-logs-viewer
+    image: amir20/dozzle:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8888:8080"
+    restart: unless-stopped
     networks:
       - scalping-network
 
