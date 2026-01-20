@@ -118,7 +118,7 @@ class MarketScanner:
     async def load_active_symbols(self):
         """Carrega símbolos ativos do banco"""
         try:
-        try:
+
             # Usar método centralizado do banco de dados
             active_coins = await self.db.get_active_symbols()
 
