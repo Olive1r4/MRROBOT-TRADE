@@ -209,11 +209,14 @@ async def execute_trade(
         risk_manager.register_order()
 
         # 8. SALVAR NO BANCO DE DADOS
-        # Testando com campos mínimos para descobrir schema da tabela
+        # Campos básicos obrigatórios para trades_mrrobot
         trade_data = {
             'symbol': symbol,
+            'side': 'buy',
             'entry_price': current_price,
-            'quantity': quantity
+            'quantity': quantity,
+            'leverage': leverage,
+            'status': 'open'
         }
 
         trade_id = await db.create_trade(trade_data)
