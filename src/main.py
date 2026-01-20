@@ -29,6 +29,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Silenciar logs do httpx (Supabase e outros requests)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 # Inicializar aplicação
 app = FastAPI(
     title="Scalping Bot API",
@@ -85,13 +88,13 @@ async def startup_event():
         # Enviar notificação de startup
         await telegram.notify_startup(config)
         logger.info("✅ Notificação de startup enviada")
-        
+
         # Iniciar MARKET SCANNER em background (detecta entradas tick-by-tick)
         if config.ENABLE_SCANNER:
             from src.market_scanner import start_market_scanner
             asyncio.create_task(start_market_scanner(config, exchange, risk_manager, db, telegram))
             logger.info("🔍 Market Scanner iniciado (Entrada Tempo Real)")
-        
+
         # Iniciar TRADE MONITOR em background (monitora saídas tick-by-tick)
         from src.trade_monitor import start_trade_monitor
         asyncio.create_task(start_trade_monitor(config, exchange, db, telegram, risk_manager))
@@ -107,94 +110,87 @@ async def startup_event():
 async def execute_trade(symbol: str, webhook_price: Optional[float] = None):
     """
     Executa um trade completo com todas as validações
-    
+
     Args:
         symbol: Símbolo da moeda (ex: BTCUSDT)
         webhook_price: Preço sugerido pelo webhook (opcional)
     """
     try:
-        logger.info("=" * 60)
         logger.info(f"🚀 INICIANDO TRADE: {symbol}")
-        logger.info("=" * 60)
-        
+
         # 1. VALIDAÇÕES DE RISCO
         validation = await risk_manager.validate_trade_entry(symbol)
-        
+
         if not validation['allowed']:
             logger.warning(f"❌ Trade bloqueado para {symbol}")
             for reason in validation['reasons']:
                 logger.warning(f"   {reason}")
-            
+
             await db.log('WARNING', f'Trade bloqueado: {symbol}', {
                 'reasons': validation['reasons']
             }, symbol=symbol)
-            
+
             return {
                 'success': False,
                 'message': 'Trade bloqueado por guardrails de segurança',
                 'reasons': validation['reasons']
             }
-        
+
         coin_config = validation['coin_config']
-        
+
         # 2. OBTER DADOS DO MERCADO
         logger.info(f"📊 Obtendo dados de mercado de {symbol}...")
-        
+
         current_price = exchange.get_current_price(symbol)
         ohlcv_data = exchange.fetch_ohlcv(symbol, config.TIMEFRAME, limit=500)
-        
+
         logger.info(f"💰 Preço atual: ${current_price:.4f}")
-        
+
         # 3. ANÁLISE TÉCNICA
         logger.info(f"📈 Analisando indicadores técnicos...")
-        
+
         signal = signal_analyzer.analyze_entry_signal(symbol, ohlcv_data, current_price)
-        
+
         if not signal['should_enter']:
             logger.info(f"⏸️ Sinal de entrada NÃO confirmado para {symbol}")
             logger.info(f"   Razão: {signal['reason']}")
-            
+
             await db.log('INFO', f'Sinal de entrada negado: {symbol}', {
                 'reason': signal['reason'],
                 'indicators': signal['indicators']
             }, symbol=symbol)
-            
+
             return {
                 'success': False,
                 'message': 'Sinal de entrada não confirmado',
                 'reason': signal['reason'],
                 'indicators': signal['indicators']
             }
-        
+
         logger.info(f"✅ Sinal de entrada CONFIRMADO!")
-        
+
         # 4. CALCULAR TAMANHO DA POSIÇÃO
         usdt_amount, leverage = await risk_manager.calculate_position_size(
             symbol, current_price, coin_config
         )
-        
+
         # 5. PREPARAR ORDEM
         quantity, total_value = exchange.calculate_order_size(symbol, usdt_amount, current_price)
-        
-        logger.info(f"💼 Preparando ordem:")
-        logger.info(f"   Quantidade: {quantity} {symbol}")
-        logger.info(f"   Valor: ${total_value:.2f}")
-        logger.info(f"   Alavancagem: {leverage}x")
-        logger.info(f"   🎯 Take Profit: ${signal['take_profit']:.4f}")
-        logger.info(f"   🛑 Stop Loss: ${signal['stop_loss']:.4f}")
-        
+
+        logger.info(f"💼 Preparando ordem: {quantity} {symbol} (${total_value:.2f}) | {leverage}x | TP: ${signal['take_profit']:.4f} | SL: ${signal['stop_loss']:.4f}")
+
         # 6. CONFIGURAR EXCHANGE
         exchange.set_leverage(symbol, leverage)
         exchange.set_margin_mode(symbol, 'isolated')
-        
+
         # 7. EXECUTAR ORDEM DE ENTRADA
         logger.info(f"🔄 Executando ordem de compra...")
-        
+
         order_entry = exchange.create_market_buy_order(symbol, quantity, current_price)
-        
+
         # Registrar no rate limiter
         risk_manager.register_order()
-        
+
         # 8. SALVAR NO BANCO DE DADOS
         trade_data = {
             'symbol': symbol,
@@ -209,28 +205,26 @@ async def execute_trade(symbol: str, webhook_price: Optional[float] = None):
             'order_id_entry': order_entry.get('id'),
             'mode': config.MODE
         }
-        
+
         trade_id = await db.create_trade(trade_data)
-        
+
         logger.info(f"✅ Trade criado com ID: {trade_id}")
-        
+
         await db.log('INFO', f'Trade aberto: {symbol}', {
             'trade_id': trade_id,
             'entry_price': current_price,
             'quantity': quantity,
             'indicators': signal['indicators']
         }, symbol=symbol, trade_id=trade_id)
-        
+
         # Notificar abertura via Telegram
         await telegram.notify_trade_open(trade_data, signal)
-        
-        logger.info("=" * 60)
-        logger.info(f"✅ TRADE EXECUTADO COM SUCESSO!")
-        logger.info("=" * 60)
-        
+
+        logger.info(f"✅ TRADE EXECUTADO COM SUCESSO! ID: {trade_id}")
+
         # 9. MONITORAR TRADE (em background)
         asyncio.create_task(monitor_trade(trade_id))
-        
+
         return {
             'success': True,
             'message': 'Trade executado com sucesso',
@@ -242,14 +236,14 @@ async def execute_trade(symbol: str, webhook_price: Optional[float] = None):
             'stop_loss': signal['stop_loss'],
             'indicators': signal['indicators']
         }
-    
+
     except Exception as e:
         logger.error(f"❌ Erro ao executar trade: {str(e)}", exc_info=True)
-        
+
         await db.log('ERROR', f'Erro ao executar trade: {symbol}', {
             'error': str(e)
         }, symbol=symbol)
-        
+
         return {
             'success': False,
             'message': f'Erro ao executar trade: {str(e)}'
@@ -259,62 +253,62 @@ async def execute_trade(symbol: str, webhook_price: Optional[float] = None):
 async def monitor_trade(trade_id: int):
     """
     Monitora um trade aberto e fecha quando atingir TP ou SL
-    
+
     Args:
         trade_id: ID do trade a ser monitorado
     """
     try:
         logger.info(f"👁️ Monitorando trade {trade_id}...")
-        
+
         while True:
             # Aguardar intervalo (verifica a cada 5 segundos)
             await asyncio.sleep(5)
-            
+
             # Obter dados do trade
             trade = await db.get_trade_by_id(trade_id)
-            
+
             if not trade or trade['status'] != 'open':
                 logger.info(f"✋ Trade {trade_id} não está mais aberto. Parando monitoramento.")
                 break
-            
+
             symbol = trade['symbol']
             entry_price = float(trade['entry_price'])
             quantity = float(trade['quantity'])
             target_price = float(trade['target_price'])
             stop_loss = float(trade['stop_loss_price'])
-            
+
             # Obter preço atual
             current_price = exchange.get_current_price(symbol)
-            
+
             # Verificar condições de saída
             should_exit, exit_reason = signal_analyzer.check_exit_conditions(
                 entry_price, current_price, stop_loss, target_price
             )
-            
+
             if should_exit:
                 logger.info(f"🚪 Condição de saída atingida para trade {trade_id}")
                 logger.info(f"   Razão: {exit_reason}")
-                
+
                 # Executar ordem de venda
                 order_exit = exchange.create_market_sell_order(symbol, quantity, current_price)
-                
+
                 # Registrar no rate limiter
                 risk_manager.register_order()
-                
+
                 # Fechar trade no banco
                 pnl, pnl_pct = await db.close_trade(
-                    trade_id, 
-                    current_price, 
+                    trade_id,
+                    current_price,
                     exit_reason,
                     order_exit.get('id')
                 )
-                
+
                 # Definir cooldown
                 await risk_manager.set_trade_cooldown(symbol)
-                
+
                 logger.info(f"✅ Trade {trade_id} fechado")
                 logger.info(f"   PnL: ${pnl:.2f} ({pnl_pct:+.2f}%)")
-                
+
                 await db.log('INFO', f'Trade fechado: {symbol}', {
                     'trade_id': trade_id,
                     'exit_price': current_price,
@@ -322,15 +316,15 @@ async def monitor_trade(trade_id: int):
                     'pnl_percentage': pnl_pct,
                     'reason': exit_reason
                 }, symbol=symbol, trade_id=trade_id)
-                
+
                 # Notificar fechamento via Telegram
                 await telegram.notify_trade_close(trade, current_price, pnl, pnl_pct)
-                
+
                 break
-    
+
     except Exception as e:
         logger.error(f"❌ Erro ao monitorar trade {trade_id}: {str(e)}", exc_info=True)
-        
+
         await db.log('ERROR', f'Erro ao monitorar trade', {
             'trade_id': trade_id,
             'error': str(e)
@@ -359,14 +353,14 @@ async def health_check():
     try:
         # Testar conexão com exchange
         exchange_ok = exchange.is_market_open('BTCUSDT')
-        
+
         # Obter estatísticas
         stats = await db.get_statistics(days=1)
-        
+
         # Verificar circuit breaker
         daily_pnl = await db.get_daily_pnl()
         circuit_breaker_active = daily_pnl.get('is_circuit_breaker_active', False) if daily_pnl else False
-        
+
         return {
             'status': 'healthy',
             'mode': config.MODE,
@@ -393,16 +387,16 @@ async def health_check():
 
 @app.post("/webhook")
 async def webhook(
-    signal: WebhookSignal, 
+    signal: WebhookSignal,
     background_tasks: BackgroundTasks,
     x_webhook_secret: Optional[str] = Header(None)
 ):
     """
     Endpoint principal do webhook para receber sinais
-    
+
     Headers:
         x-webhook-secret: Token secreto para autenticação
-    
+
     Body:
         {
             "symbol": "BTCUSDT",
@@ -416,19 +410,19 @@ async def webhook(
         if x_webhook_secret != config.WEBHOOK_SECRET:
             logger.warning(f"⚠️ Tentativa de acesso não autorizado ao webhook")
             raise HTTPException(status_code=401, detail="Token inválido")
-        
+
         logger.info(f"📥 Webhook recebido: {signal.symbol} - {signal.action}")
-        
+
         # Validar ação (apenas buy para scalping long)
         if signal.action.lower() != 'buy':
             return {
                 'success': False,
                 'message': f'Ação {signal.action} não suportada (apenas buy para scalping long)'
             }
-        
+
         # Executar trade em background
         background_tasks.add_task(execute_trade, signal.symbol, signal.price)
-        
+
         return {
             'success': True,
             'message': 'Sinal recebido e processamento iniciado',
@@ -436,7 +430,7 @@ async def webhook(
             'action': signal.action,
             'received_at': datetime.now().isoformat()
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -448,7 +442,7 @@ async def webhook(
 async def manual_trade(trade: ManualTrade, background_tasks: BackgroundTasks):
     """
     Endpoint para executar trade manual
-    
+
     Body:
         {
             "symbol": "BTCUSDT",
@@ -457,16 +451,16 @@ async def manual_trade(trade: ManualTrade, background_tasks: BackgroundTasks):
     """
     try:
         logger.info(f"👤 Trade manual solicitado: {trade.symbol}")
-        
+
         # Executar trade em background
         background_tasks.add_task(execute_trade, trade.symbol)
-        
+
         return {
             'success': True,
             'message': 'Trade manual iniciado',
             'symbol': trade.symbol
         }
-    
+
     except Exception as e:
         logger.error(f"❌ Erro ao executar trade manual: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -492,10 +486,10 @@ async def get_trade(trade_id: int):
     """Retorna informações de um trade específico"""
     try:
         trade = await db.get_trade_by_id(trade_id)
-        
+
         if not trade:
             raise HTTPException(status_code=404, detail="Trade não encontrado")
-        
+
         return {
             'success': True,
             'trade': trade
@@ -512,32 +506,32 @@ async def close_trade_manually(trade_id: int):
     """Fecha um trade manualmente"""
     try:
         trade = await db.get_trade_by_id(trade_id)
-        
+
         if not trade:
             raise HTTPException(status_code=404, detail="Trade não encontrado")
-        
+
         if trade['status'] != 'open':
             raise HTTPException(status_code=400, detail="Trade não está aberto")
-        
+
         symbol = trade['symbol']
         quantity = float(trade['quantity'])
-        
+
         # Obter preço atual e executar venda
         current_price = exchange.get_current_price(symbol)
         order_exit = exchange.create_market_sell_order(symbol, quantity, current_price)
-        
+
         # Fechar no banco
         pnl, pnl_pct = await db.close_trade(
-            trade_id, 
-            current_price, 
+            trade_id,
+            current_price,
             "Fechamento manual",
             order_exit.get('id')
         )
-        
+
         await risk_manager.set_trade_cooldown(symbol)
-        
+
         logger.info(f"✅ Trade {trade_id} fechado manualmente")
-        
+
         return {
             'success': True,
             'message': 'Trade fechado com sucesso',
@@ -546,7 +540,7 @@ async def close_trade_manually(trade_id: int):
             'pnl': pnl,
             'pnl_percentage': pnl_pct
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -589,20 +583,20 @@ async def toggle_coin_status(symbol: str):
     """Ativa/desativa uma moeda"""
     try:
         coin_config = await db.get_coin_config(symbol)
-        
+
         if not coin_config:
             raise HTTPException(status_code=404, detail="Moeda não encontrada")
-        
+
         new_status = not coin_config['is_active']
         await db.update_coin_status(symbol, new_status)
-        
+
         return {
             'success': True,
             'message': f'Moeda {symbol} {"ativada" if new_status else "desativada"}',
             'symbol': symbol,
             'is_active': new_status
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -618,7 +612,7 @@ if __name__ == "__main__":
     # Criar diretório de logs se não existir
     import os
     os.makedirs('logs', exist_ok=True)
-    
+
     # Iniciar servidor
     uvicorn.run(
         "src.main:app",

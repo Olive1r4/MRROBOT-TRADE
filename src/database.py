@@ -437,7 +437,7 @@ class Database:
         except Exception as e:
             logger.error(f"❌ Erro ao obter estatísticas: {str(e)}")
             return {}
-
+    
     # ============================================
     # HELPERS
     # ============================================
