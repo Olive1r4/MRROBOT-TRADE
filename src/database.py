@@ -446,7 +446,7 @@ class Database:
     async def get_active_symbols(self) -> List[Dict]:
         """Obtém lista de símbolos ativos (usado pelo scanner)"""
         try:
-            response = self.client.table('coins_config')\
+            response = self.client.table('coins_mrrobot')\
                 .select('symbol')\
                 .eq('is_active', True)\
                 .execute()
