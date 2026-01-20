@@ -219,7 +219,8 @@ async def execute_trade(
             'stop_loss_price': signal['stop_loss'],
             'status': 'open',
             'entry_reason': signal['reason'],
-            'order_id_entry': order_entry.get('id')
+            'order_id_entry': order_entry.get('id'),
+            'mode': config.MODE
         }
 
         trade_id = await db.create_trade(trade_data)

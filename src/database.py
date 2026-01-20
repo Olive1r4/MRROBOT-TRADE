@@ -88,7 +88,7 @@ class Database:
             ID do trade criado
         """
         try:
-            response = self.client.table('trades_mrrobot')\
+            response = self.client.table('trades_history')\
                 .insert(trade_data)\
                 .execute()
 
@@ -103,7 +103,7 @@ class Database:
     async def update_trade(self, trade_id: int, update_data: Dict):
         """Atualiza um trade existente"""
         try:
-            self.client.table('trades_mrrobot')\
+            self.client.table('trades_history')\
                 .update(update_data)\
                 .eq('id', trade_id)\
                 .execute()
@@ -117,7 +117,7 @@ class Database:
         """Fecha um trade e calcula o PnL"""
         try:
             # Obter dados do trade
-            response = self.client.table('trades_mrrobot')\
+            response = self.client.table('trades_history')\
                 .select('*')\
                 .eq('id', trade_id)\
                 .single()\
@@ -173,7 +173,7 @@ class Database:
     async def get_open_trades(self) -> List[Dict]:
         """Obtém todos os trades abertos"""
         try:
-            response = self.client.table('trades_mrrobot')\
+            response = self.client.table('trades_history')\
                 .select('*')\
                 .eq('status', 'open')\
                 .execute()
@@ -186,7 +186,7 @@ class Database:
     async def get_trade_by_id(self, trade_id: int) -> Optional[Dict]:
         """Obtém um trade específico por ID"""
         try:
-            response = self.client.table('trades_mrrobot')\
+            response = self.client.table('trades_history')\
                 .select('*')\
                 .eq('id', trade_id)\
                 .single()\
@@ -212,7 +212,7 @@ class Database:
                 'status': 'closed'
             }
 
-            self.client.table('trades_mrrobot')\
+            self.client.table('trades_history')\
                 .update(update_data)\
                 .eq('id', trade_id)\
                 .execute()
@@ -225,7 +225,7 @@ class Database:
     async def get_trades_by_symbol(self, symbol: str, status: str = None) -> List[Dict]:
         """Obtém trades de um símbolo específico"""
         try:
-            query = self.client.table('trades_mrrobot').select('*').eq('symbol', symbol)
+            query = self.client.table('trades_history').select('*').eq('symbol', symbol)
 
             if status:
                 query = query.eq('status', status)
@@ -243,7 +243,7 @@ class Database:
         Retorna o ID do trade criado
         """
         try:
-            response = self.client.table('trades_mrrobot')\
+            response = self.client.table('trades_history')\
                 .insert(trade_data)\
                 .execute()
 
