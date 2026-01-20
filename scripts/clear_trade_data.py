@@ -34,11 +34,11 @@ async def clear_data():
 
         # 3. Limpar estatísticas diárias
         print("📊 Limpando estatísticas diárias...")
-        db.client.table('daily_stats_mrrobot').delete().neq('id', -1).execute()
+        db.client.table('daily_stats_mrrobot').delete().neq('trade_date', '1970-01-01').execute()
 
         # 4. Limpar cooldowns
         print("⏱️ Limpando cooldowns ativos...")
-        db.client.table('cooldown_mrrobot').delete().neq('id', -1).execute()
+        db.client.table('cooldown_mrrobot').delete().neq('symbol', '').execute()
 
         print("\n✨ BANCO DE DADOS LIMPO COM SUCESSO!")
         print("O bot agora iniciará como se fosse a primeira execução.")
