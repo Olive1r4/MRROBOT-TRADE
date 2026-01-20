@@ -133,16 +133,16 @@ class TradeMonitor:
                 return
 
             for trade_db in open_trades_db:
-                # Converter para OpenTrade
+                # Converter para OpenTrade com segurança usando .get()
                 open_trade = OpenTrade(
-                    trade_id=trade_db['id'],
-                    symbol=trade_db['symbol'],
-                    entry_price=float(trade_db['entry_price']),
-                    quantity=float(trade_db['quantity']),
-                    leverage=int(trade_db['leverage']),
-                    target_price=float(trade_db['target_price']),
-                    stop_loss_price=float(trade_db['stop_loss_price']),
-                    entry_time=datetime.fromisoformat(trade_db['entry_time'].replace('Z', '+00:00'))
+                    trade_id=trade_db.get('id'),
+                    symbol=trade_db.get('symbol'),
+                    entry_price=float(trade_db.get('entry_price', 0)),
+                    quantity=float(trade_db.get('quantity', 0)),
+                    leverage=int(trade_db.get('leverage', 1)),
+                    target_price=float(trade_db.get('target_price', 0)),
+                    stop_loss_price=float(trade_db.get('stop_loss_price', 0)),
+                    entry_time=datetime.fromisoformat(trade_db.get('entry_time', datetime.now().isoformat()).replace('Z', '+00:00'))
                 )
 
                 # Adicionar à lista de monitoramento
@@ -173,13 +173,13 @@ class TradeMonitor:
 
                 open_trade = OpenTrade(
                     trade_id=trade_id,
-                    symbol=trade_db['symbol'],
-                    entry_price=float(trade_db['entry_price']),
-                    quantity=float(trade_db['quantity']),
-                    leverage=int(trade_db['leverage']),
-                    target_price=float(trade_db['target_price']),
-                    stop_loss_price=float(trade_db['stop_loss_price']),
-                    entry_time=datetime.fromisoformat(trade_db['entry_time'].replace('Z', '+00:00'))
+                    symbol=trade_db.get('symbol'),
+                    entry_price=float(trade_db.get('entry_price', 0)),
+                    quantity=float(trade_db.get('quantity', 0)),
+                    leverage=int(trade_db.get('leverage', 1)),
+                    target_price=float(trade_db.get('target_price', 0)),
+                    stop_loss_price=float(trade_db.get('stop_loss_price', 0)),
+                    entry_time=datetime.fromisoformat(trade_db.get('entry_time', datetime.now().isoformat()).replace('Z', '+00:00'))
                 )
 
                 await self.add_trade_to_monitor(open_trade)
