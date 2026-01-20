@@ -5,7 +5,7 @@ Monitora posições abertas via WebSocket com latência ZERO
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Set
 import websockets
 from dataclasses import dataclass, field
@@ -414,8 +414,8 @@ class TradeMonitor:
                 trade.update_pnl(current_price, self.config.TRADING_FEE)
 
                 # Log a cada 10s (para não poluir)
-                now = datetime.now()
-                last_log = self.last_log_time.get(trade.trade_id, datetime.min)
+                now = datetime.now(timezone.utc)
+                last_log = self.last_log_time.get(trade.trade_id, datetime.min.replace(tzinfo=timezone.utc))
                 if (now - last_log).total_seconds() >= 10:
                     self.last_log_time[trade.trade_id] = now
                     logger.info(f"📊 {symbol}: ${current_price:.4f} | PnL: {trade.pnl_percent * 100:+.3f}% (Target: ${trade.target_price:.4f})")
