@@ -192,7 +192,8 @@ async def execute_trade(
         )
 
         # 5. PREPARAR ORDEM
-        quantity, total_value = exchange.calculate_order_size(symbol, usdt_amount, current_price)
+        # IMPORTANTE: Calcular quantidade baseada no valor NOMINAL (margem * alavancagem)
+        quantity, total_value = exchange.calculate_order_size(symbol, usdt_amount * leverage, current_price)
 
         logger.info(f"💼 Preparando ordem: {quantity} {symbol} (${total_value:.2f}) | {leverage}x | TP: ${signal['take_profit']:.4f} | SL: ${signal['stop_loss']:.4f}")
 
