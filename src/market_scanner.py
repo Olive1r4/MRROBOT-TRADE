@@ -416,7 +416,7 @@ class MarketScanner:
 
                 # Adicionar aviso se as entradas estão travadas pelo limite de trades
                 if self.open_trades_count >= self.config.MAX_OPEN_TRADES:
-                    status_msg += " | ⏸️ (Limite de trades atingido)"
+                    status_msg += f" | ⏸️ (Limite: {self.open_trades_count}/{self.config.MAX_OPEN_TRADES} trades)"
 
                 logger.info(status_msg)
                 state.last_update = datetime.now()
