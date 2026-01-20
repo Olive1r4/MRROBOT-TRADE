@@ -3,6 +3,7 @@ Notificações via Telegram
 """
 import httpx
 import logging
+import html
 from typing import Dict, Optional
 from datetime import datetime
 
@@ -53,7 +54,7 @@ class TelegramNotifier:
                     logger.error(f"❌ Erro ao enviar Telegram: {response.status_code} - {response.text}")
 
         except Exception as e:
-            logger.error(f"❌ Erro ao enviar notificação Telegram: {str(e)}")
+            logger.error(f"❌ Erro ao enviar notificação Telegram: {repr(e)}", exc_info=True)
 
     async def notify_startup(self, config):
         """Notifica inicialização do bot"""
@@ -93,7 +94,7 @@ class TelegramNotifier:
         if not self.enabled:
             return
 
-        symbol = trade_data.get('symbol', 'N/A')
+        symbol = html.escape(str(trade_data.get('symbol', 'N/A')))
         entry_price = float(trade_data.get('entry_price', 0))
         quantity = float(trade_data.get('quantity', 0))
         leverage = int(trade_data.get('leverage', 1))
@@ -150,7 +151,7 @@ class TelegramNotifier:
         if not self.enabled:
             return
 
-        symbol = trade_data.get('symbol', 'N/A')
+        symbol = html.escape(str(trade_data.get('symbol', 'N/A')))
         entry_price = float(trade_data.get('entry_price', 0))
         quantity = float(trade_data.get('quantity', 0))
         leverage = int(trade_data.get('leverage', 1))
