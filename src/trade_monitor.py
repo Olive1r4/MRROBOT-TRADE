@@ -57,11 +57,21 @@ class OpenTrade:
         self.pnl_usdt = position_value * self.pnl_percent
 
     def should_take_profit(self, target_profit_net: float) -> bool:
-        """Verifica se atingiu o take profit (após fees)"""
+        """
+        Verifica se atingiu o take profit (após fees)
+        Prioriza o target_price dinâmico se estiver definido.
+        """
+        if self.target_price > 0 and self.last_price >= self.target_price:
+            return True
         return self.pnl_percent >= target_profit_net
 
     def should_stop_loss(self, stop_loss_percent: float) -> bool:
-        """Verifica se atingiu o stop loss"""
+        """
+        Verifica se atingiu o stop loss
+        Prioriza o stop_loss_price dinâmico se estiver definido.
+        """
+        if self.stop_loss_price > 0 and self.last_price <= self.stop_loss_price:
+            return True
         return self.pnl_percent <= -stop_loss_percent
 
 
@@ -95,6 +105,9 @@ class TradeMonitor:
 
         # Task única para gerenciar o WebSocket
         self.monitor_task: Optional[asyncio.Task] = None
+
+        # Controle de log a cada 10s por trade
+        self.last_log_time: Dict[str, datetime] = {}
 
         # Flag para shutdown gracioso
         self.is_running = True
@@ -401,19 +414,21 @@ class TradeMonitor:
                 trade.update_pnl(current_price, self.config.TRADING_FEE)
 
                 # Log a cada 10s (para não poluir)
-                time_since_last = (datetime.now() - trade.last_update).total_seconds()
-                if time_since_last >= 10:
-                    logger.info(f"📊 {symbol}: ${current_price:.2f} | PnL: {trade.pnl_percent * 100:+.3f}% (${trade.pnl_usdt:+.2f})")
+                now = datetime.now()
+                last_log = self.last_log_time.get(trade.trade_id, datetime.min)
+                if (now - last_log).total_seconds() >= 10:
+                    self.last_log_time[trade.trade_id] = now
+                    logger.info(f"📊 {symbol}: ${current_price:.4f} | PnL: {trade.pnl_percent * 100:+.3f}% (Target: ${trade.target_price:.4f})")
 
                 # VERIFICAR TAKE PROFIT
                 if trade.should_take_profit(self.config.TARGET_PROFIT_NET):
-                    logger.info(f"🎯 TAKE PROFIT: {symbol} | Entrada: ${trade.entry_price:.2f} -> Saída: ${current_price:.2f} | PnL: {trade.pnl_percent * 100:+.2f}% (${trade.pnl_usdt:+.2f})")
+                    logger.info(f"🎯 TAKE PROFIT: {symbol} | Entrada: ${trade.entry_price:.2f} -> Saída: ${current_price:.2f} | PnL: {trade.pnl_percent * 100:+.2f}% (ID: {trade.trade_id})")
 
                     await self.close_trade(trade, current_price, "TAKE_PROFIT")
 
                 # VERIFICAR STOP LOSS
                 elif trade.should_stop_loss(self.config.STOP_LOSS_PERCENTAGE):
-                    logger.warning(f"🛑 STOP LOSS: {symbol} | Entrada: ${trade.entry_price:.2f} -> Saída: ${current_price:.2f} | PnL: {trade.pnl_percent * 100:+.2f}% (${trade.pnl_usdt:+.2f})")
+                    logger.warning(f"🛑 STOP LOSS: {symbol} | Entrada: ${trade.entry_price:.2f} -> Saída: ${current_price:.2f} | PnL: {trade.pnl_percent * 100:+.2f}% (ID: {trade.trade_id})")
 
                     await self.close_trade(trade, current_price, "STOP_LOSS")
 
