@@ -420,10 +420,32 @@ class MarketScanner:
                     logger.warning(f"   • {reason}")
                 return
 
+            # Calcular TP e SL baseado nos indicadores atuais
+            atr = state.bb_upper - state.bb_lower  # Aproximação do ATR
+            stop_loss = entry_price - (atr * 0.8)  # SL: 0.8x ATR abaixo
+            take_profit = entry_price + (atr * 0.68)  # TP: 0.68x ATR acima (ratio 1:0.85)
+
+            # Preparar indicadores para passar ao execute_trade
+            scanner_indicators = {
+                'rsi': state.rsi,
+                'bb_upper': state.bb_upper,
+                'bb_middle': state.bb_middle,
+                'bb_lower': state.bb_lower,
+                'ema_200': state.ema_200,
+                'take_profit': take_profit,
+                'stop_loss': stop_loss,
+                'volume_ratio': state.volume_ratio
+            }
+
             # Importar e chamar diretamente a função execute_trade
             from src.main import execute_trade
 
-            result = await execute_trade(symbol, entry_price)
+            result = await execute_trade(
+                symbol=symbol,
+                scanner_validated=True,
+                scanner_price=entry_price,
+                scanner_indicators=scanner_indicators
+            )
 
             if result.get('success'):
                 trade_id = result.get('trade_id')

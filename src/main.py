@@ -100,13 +100,23 @@ async def startup_event():
 # FUNÇÕES AUXILIARES
 # ============================================
 
-async def execute_trade(symbol: str, webhook_price: Optional[float] = None):
+async def execute_trade(
+    symbol: str,
+    webhook_price: Optional[float] = None,
+    # Parâmetros do scanner (pré-validados)
+    scanner_validated: bool = False,
+    scanner_price: Optional[float] = None,
+    scanner_indicators: Optional[dict] = None
+):
     """
     Executa um trade completo com todas as validações
 
     Args:
         symbol: Símbolo da moeda (ex: BTCUSDT)
         webhook_price: Preço sugerido pelo webhook (opcional)
+        scanner_validated: Se True, pula validação de sinal (já validado pelo scanner)
+        scanner_price: Preço detectado pelo scanner
+        scanner_indicators: Indicadores pré-calculados pelo scanner
     """
     try:
         logger.info(f"🚀 INICIANDO TRADE: {symbol}")
@@ -131,34 +141,48 @@ async def execute_trade(symbol: str, webhook_price: Optional[float] = None):
 
         coin_config = validation['coin_config']
 
-        # 2. OBTER DADOS DO MERCADO
-        logger.info(f"📊 Obtendo dados de mercado de {symbol}...")
-
-        current_price = exchange.get_current_price(symbol)
-        ohlcv_data = exchange.fetch_ohlcv(symbol, config.TIMEFRAME, limit=500)
-
-        logger.info(f"💰 Preço atual: ${current_price:.4f}")
-
-        # 3. ANÁLISE TÉCNICA
-        logger.info(f"📈 Analisando indicadores técnicos...")
-
-        signal = signal_analyzer.analyze_entry_signal(symbol, ohlcv_data, current_price)
-
-        if not signal['should_enter']:
-            logger.info(f"⏸️ Sinal de entrada NÃO confirmado para {symbol}")
-            logger.info(f"   Razão: {signal['reason']}")
-
-            await db.log('INFO', f'Sinal de entrada negado: {symbol}', {
-                'reason': signal['reason'],
-                'indicators': signal['indicators']
-            }, symbol=symbol)
-
-            return {
-                'success': False,
-                'message': 'Sinal de entrada não confirmado',
-                'reason': signal['reason'],
-                'indicators': signal['indicators']
+        # 2. OBTER DADOS DO MERCADO (ou usar do scanner)
+        if scanner_validated and scanner_price and scanner_indicators:
+            # Usar dados já validados pelo scanner
+            logger.info(f"📊 Usando dados pré-validados do scanner")
+            current_price = scanner_price
+            signal = {
+                'should_enter': True,
+                'reason': 'Scanner: RSI oversold + BB lower + EMA uptrend',
+                'take_profit': scanner_indicators['take_profit'],
+                'stop_loss': scanner_indicators['stop_loss'],
+                'indicators': scanner_indicators
             }
+            logger.info(f"💰 Preço: ${current_price:.4f} | RSI: {scanner_indicators['rsi']:.2f} | BB: ${scanner_indicators['bb_lower']:.2f} | EMA: ${scanner_indicators['ema_200']:.2f}")
+        else:
+            # Buscar dados normalmente (webhook ou manual)
+            logger.info(f"📊 Obtendo dados de mercado de {symbol}...")
+
+            current_price = exchange.get_current_price(symbol)
+            ohlcv_data = exchange.fetch_ohlcv(symbol, config.TIMEFRAME, limit=500)
+
+            logger.info(f"💰 Preço atual: ${current_price:.4f}")
+
+            # 3. ANÁLISE TÉCNICA
+            logger.info(f"📈 Analisando indicadores técnicos...")
+
+            signal = signal_analyzer.analyze_entry_signal(symbol, ohlcv_data, current_price)
+
+            if not signal['should_enter']:
+                logger.info(f"⏸️ Sinal de entrada NÃO confirmado para {symbol}")
+                logger.info(f"   Razão: {signal['reason']}")
+
+                await db.log('INFO', f'Sinal de entrada negado: {symbol}', {
+                    'reason': signal['reason'],
+                    'indicators': signal['indicators']
+                }, symbol=symbol)
+
+                return {
+                    'success': False,
+                    'message': 'Sinal de entrada não confirmado',
+                    'reason': signal['reason'],
+                    'indicators': signal['indicators']
+                }
 
         logger.info(f"✅ Sinal de entrada CONFIRMADO!")
 
