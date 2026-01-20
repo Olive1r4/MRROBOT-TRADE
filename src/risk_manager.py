@@ -16,6 +16,7 @@ class RiskManager:
 
     def __init__(self, config, database):
         self.config = config
+        self.db = database
         # Cache local para rate limiting
         self.orders_in_current_minute = []
         logger.info(f"   📉 Daily Stop Loss: {self.config.DAILY_STOP_LOSS * 100:.1f}%")
