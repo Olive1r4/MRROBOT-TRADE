@@ -85,6 +85,7 @@ class MarketScanner:
 
         # Flag para shutdown
         self.is_running = True
+        self.running_tasks: Set[str] = set()
 
     async def start(self):
         """Inicia o scanner"""
@@ -92,28 +93,31 @@ class MarketScanner:
         logger.info("🚀 MARKET SCANNER START")
         logger.info("=" * 60)
 
-        # Carregar símbolos ativos
-        await self.load_active_symbols()
+        # Task para atualizar símbolos dinamicamente
+        asyncio.create_task(self.dynamic_symbol_refresher())
 
-        if not self.active_symbols:
-            logger.warning("⚠️ Nenhum símbolo ativo. Scanner pausado.")
-            return
+        # Manter o scanner rodando
+        while self.is_running:
+            await asyncio.sleep(10)
 
-        active_list = ", ".join(self.active_symbols)
-        logger.info(f"📊 Monitorando ({len(self.active_symbols)}): {active_list}")
+    async def dynamic_symbol_refresher(self):
+        """Task que verifica novos símbolos ativos periodicamente"""
+        while self.is_running:
+            try:
+                await self.load_active_symbols()
 
-        # Iniciar tasks para cada símbolo
-        # Cada símbolo terá 2 WebSockets: Kline (indicadores) + MiniTicker (entrada)
-        tasks = []
-        for symbol in self.active_symbols:
-            # Task 1: Kline (atualiza indicadores)
-            tasks.append(asyncio.create_task(self.monitor_kline(symbol)))
+                for symbol in self.active_symbols:
+                    if symbol not in self.running_tasks:
+                        logger.info(f"🆕 Iniciando monitoramento dinâmico: {symbol}")
+                        self.running_tasks.add(symbol)
+                        # Iniciar tasks para o novo símbolo
+                        asyncio.create_task(self.monitor_kline(symbol))
+                        asyncio.create_task(self.monitor_miniticker(symbol))
 
-            # Task 2: MiniTicker (verifica entrada tick-by-tick)
-            tasks.append(asyncio.create_task(self.monitor_miniticker(symbol)))
+            except Exception as e:
+                logger.error(f"❌ Erro no refresher dinâmico: {e}")
 
-        # Aguardar todas as tasks
-        await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.sleep(300)  # Verificar a cada 5 minutos
 
     async def load_active_symbols(self):
         """Carrega símbolos ativos do banco"""
@@ -371,6 +375,12 @@ class MarketScanner:
 
             # Verificar se indicadores estão prontos
             if state.rsi == 0 or state.ema_200 == 0:
+                return
+
+            # PRIORIDADE DE SINAL: Se já existe trade aberto, ignorar todos os outros ticks
+            # Isso poupa processamento e garante a regra do "primeiro que disparar ganha"
+            open_trades = await self.db.get_open_trades()
+            if len(open_trades) >= self.config.MAX_OPEN_TRADES:
                 return
 
             # Verificar cooldown após bloqueio
