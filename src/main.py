@@ -215,12 +215,8 @@ async def execute_trade(
             'entry_price': current_price,
             'quantity': quantity,
             'leverage': leverage,
-            'target_price': signal['take_profit'],
             'stop_loss_price': signal['stop_loss'],
-            'status': 'open',
-            'entry_reason': signal['reason'],
-            'order_id_entry': order_entry.get('id'),
-            'mode': config.MODE
+            'status': 'open'
         }
 
         trade_id = await db.create_trade(trade_data)
