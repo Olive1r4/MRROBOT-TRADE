@@ -223,11 +223,7 @@ async def execute_trade(
             'mode': config.MODE
         }
 
-        # Preparar cópia para o banco (removendo campos que não existem na tabela)
-        db_data = trade_data.copy()
-        db_data.pop('mode', None)
-
-        trade_id = db.create_trade(db_data)
+        trade_id = db.create_trade(trade_data)
 
         logger.info(f"✅ Trade criado com ID: {trade_id}")
 
