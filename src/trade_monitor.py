@@ -96,15 +96,13 @@ class TradeMonitor:
         # Flag para shutdown gracioso
         self.is_running = True
 
-        logger.info("🔭 TradeMonitor inicializado (Monitoramento Tick-by-Tick)")
+        # Flag para shutdown gracioso
+        self.is_running = True
 
     async def start(self):
         """Inicia o monitor em background"""
         logger.info("=" * 60)
-        logger.info("🚀 INICIANDO TRADE MONITOR (TEMPO REAL)")
-        logger.info("=" * 60)
-        logger.info(f"🎯 Take Profit: +{self.config.TARGET_PROFIT_NET * 100:.2f}% (líquido)")
-        logger.info(f"🛑 Stop Loss: -{self.config.STOP_LOSS_PERCENTAGE * 100:.2f}% (fixo)")
+        logger.info(f"🚀 TRADE MONITOR START | TP: +{self.config.TARGET_PROFIT_NET * 100:.2f}% | SL: -{self.config.STOP_LOSS_PERCENTAGE * 100:.2f}%")
         logger.info("=" * 60)
 
         # Carregar trades abertos do banco ao iniciar

@@ -83,18 +83,13 @@ class MarketScanner:
         # Flag para shutdown
         self.is_running = True
 
-        logger.info("🔍 MarketScanner inicializado (Entrada Tick-by-Tick)")
+        # Flag para shutdown
+        self.is_running = True
 
     async def start(self):
         """Inicia o scanner"""
         logger.info("=" * 60)
-        logger.info("🚀 INICIANDO MARKET SCANNER (TEMPO REAL)")
-        logger.info("=" * 60)
-        logger.info(f"📊 Indicadores: RSI({self.config.RSI_PERIOD}), BB({self.config.BB_PERIOD}, {self.config.BB_STD_DEV}), EMA({self.config.EMA_PERIOD})")
-        logger.info(f"🎯 Condições de entrada:")
-        logger.info(f"   • RSI < {self.config.RSI_OVERSOLD}")
-        logger.info(f"   • Preço tocou/rompeu BB Lower")
-        logger.info(f"   • Preço acima EMA {self.config.EMA_PERIOD}")
+        logger.info("🚀 MARKET SCANNER START")
         logger.info("=" * 60)
 
         # Carregar símbolos ativos
@@ -104,9 +99,8 @@ class MarketScanner:
             logger.warning("⚠️ Nenhum símbolo ativo. Scanner pausado.")
             return
 
-        logger.info(f"📊 Monitorando {len(self.active_symbols)} símbolos:")
-        for symbol in self.active_symbols:
-            logger.info(f"   • {symbol}")
+        active_list = ", ".join(self.active_symbols)
+        logger.info(f"📊 Monitorando ({len(self.active_symbols)}): {active_list}")
 
         # Iniciar tasks para cada símbolo
         # Cada símbolo terá 2 WebSockets: Kline (indicadores) + MiniTicker (entrada)
@@ -168,8 +162,6 @@ class MarketScanner:
             await self.calculate_indicators(symbol)
 
             self.buffer_ready[symbol] = True
-
-            logger.info(f"✅ {symbol}: Buffer pronto (200 velas) | RSI: {self.market_states[symbol].rsi:.2f} | BB Low: ${self.market_states[symbol].bb_lower:.2f} | EMA: ${self.market_states[symbol].ema_200:.2f}")
 
             return True
 

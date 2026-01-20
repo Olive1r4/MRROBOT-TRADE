@@ -27,6 +27,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Silenciar logs do httpx (Supabase e outros requests)
@@ -49,14 +50,7 @@ signal_analyzer = SignalAnalyzer(config)
 risk_manager = RiskManager(config, db)
 telegram = TelegramNotifier(config.TELEGRAM_BOT_TOKEN, config.TELEGRAM_CHAT_ID)
 
-logger.info("=" * 60)
-logger.info("🤖 SCALPING BOT INICIADO")
-logger.info("=" * 60)
-logger.info(f"📊 Modo: {config.MODE}")
-logger.info(f"🎯 Lucro alvo: {config.TARGET_PROFIT * 100:.2f}%")
-logger.info(f"📈 Timeframe: {config.TIMEFRAME}")
-logger.info(f"🛡️ Stop loss diário: {config.DAILY_STOP_LOSS * 100:.1f}%")
-logger.info("=" * 60)
+logger.info(f"🤖 SCALPING BOT | Mode: {config.MODE} | Target: {config.TARGET_PROFIT * 100:.2f}% | TF: {config.TIMEFRAME} | SL: {config.DAILY_STOP_LOSS * 100:.1f}%")
 
 
 # ============================================
@@ -87,7 +81,6 @@ async def startup_event():
     try:
         # Enviar notificação de startup
         await telegram.notify_startup(config)
-        logger.info("✅ Notificação de startup enviada")
 
         # Iniciar MARKET SCANNER em background (detecta entradas tick-by-tick)
         if config.ENABLE_SCANNER:
