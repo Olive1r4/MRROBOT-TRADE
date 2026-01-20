@@ -298,9 +298,9 @@ class ExchangeManager:
                 logger.info("🎭 MOCK: Retornando saldo simulado")
                 return {
                     'USDT': {
-                        'free': 10000.0,
+                        'free': 100.0,
                         'used': 0.0,
-                        'total': 10000.0
+                        'total': 100.0
                     }
                 }
         except Exception as e:

@@ -48,9 +48,9 @@ class RiskManager:
             # Verificar PnL atual
             total_pnl = daily_pnl.get('total_pnl', 0)
 
-            # Assumindo que começamos com 10000 USDT (ajustar conforme necessário)
+            # Assumindo que começamos com 100 USDT (ajustar conforme necessário)
             # TODO: Pegar saldo real do exchange
-            initial_balance = 10000.0
+            initial_balance = 100.0
             daily_loss_threshold = initial_balance * self.config.DAILY_STOP_LOSS
 
             if total_pnl < -daily_loss_threshold:
@@ -305,7 +305,7 @@ class RiskManager:
 
             # TODO: Obter saldo real do exchange
             # Por enquanto, usar valor estimado
-            total_capital = 10000.0  # Substituir por self.exchange.get_balance('USDT')
+            total_capital = 100.0  # Substituir por self.exchange.get_balance('USDT')
 
             # POSITION SIZING: 20% do capital
             usdt_amount = total_capital * self.config.POSITION_SIZE_PERCENT
