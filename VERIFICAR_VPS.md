@@ -16,7 +16,7 @@ Se preferir verificar manualmente, execute estes comandos:
 ### 1️⃣ Conectar na VPS
 
 ```bash
-ssh root@78.46.246.200
+ssh root@49.13.1.177
 ```
 
 ---
@@ -30,6 +30,7 @@ ls -la /root/MRROBOT-FUTURE
 **Esperado:** Lista de arquivos do projeto
 
 **Se não existir:**
+
 ```bash
 cd /root
 git clone https://github.com/seu-usuario/MRROBOT-FUTURE.git
@@ -46,6 +47,7 @@ cat /root/MRROBOT-FUTURE/.env | grep -v "^#" | head -20
 **Esperado:** Ver suas configurações (MODE, BINANCE_API_KEY, etc.)
 
 **Se não existir:**
+
 ```bash
 cd /root/MRROBOT-FUTURE
 cp env.template .env
@@ -65,6 +67,7 @@ which python3
 **Esperado:** Python 3.10 ou superior
 
 **Se não instalado:**
+
 ```bash
 sudo apt update
 sudo apt install python3.10 python3.10-venv python3-pip -y
@@ -79,6 +82,7 @@ ls -la /root/MRROBOT-FUTURE/venv/
 ```
 
 **Se não existir:**
+
 ```bash
 cd /root/MRROBOT-FUTURE
 python3 -m venv venv
@@ -97,6 +101,7 @@ docker images | grep robot
 ```
 
 **Se não instalado:**
+
 ```bash
 curl -fsSL https://get.docker.com | sh
 ```
@@ -112,6 +117,7 @@ systemctl status scalping-bot
 ```
 
 **Se não estiver configurado:**
+
 ```bash
 sudo cp /root/MRROBOT-FUTURE/systemd/scalping-bot.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -126,6 +132,7 @@ docker-compose ps
 ```
 
 **Se não estiver rodando:**
+
 ```bash
 cd /root/MRROBOT-FUTURE
 docker-compose up -d
@@ -179,6 +186,7 @@ curl http://localhost:8000/config/coins
 **Esperado:** Respostas JSON
 
 **Se não responder:**
+
 - Bot não está rodando
 - Porta 8000 não está aberta
 
@@ -203,10 +211,12 @@ sudo ufw status
 ```
 
 **Deve ter:**
+
 - 22/tcp (SSH) - ALLOW
 - 8000/tcp (Webhook) - ALLOW
 
 **Se não configurado:**
+
 ```bash
 sudo ufw allow ssh
 sudo ufw allow 8000
@@ -321,23 +331,23 @@ while true; do
   echo "🤖 BOT DE SCALPING - MONITORAMENTO"
   echo "════════════════════════════════════════════════════════════"
   echo ""
-  
+
   echo "🏥 SAÚDE:"
   curl -s http://localhost:8000/health | jq -r '.status, .mode' 2>/dev/null || echo "❌ API offline"
   echo ""
-  
+
   echo "📊 TRADES ABERTOS:"
   curl -s http://localhost:8000/trades/open | jq -r '.count' 2>/dev/null || echo "N/A"
   echo ""
-  
+
   echo "💰 PNL HOJE:"
   curl -s http://localhost:8000/stats?days=1 | jq -r '.statistics.total_pnl' 2>/dev/null || echo "N/A"
   echo ""
-  
+
   echo "📈 WIN RATE:"
   curl -s http://localhost:8000/stats?days=1 | jq -r '.statistics.win_rate' 2>/dev/null || echo "N/A"
   echo ""
-  
+
   echo "════════════════════════════════════════════════════════════"
   sleep 10
 done
@@ -371,10 +381,12 @@ cat .env | grep TELEGRAM
 ```
 
 **Deve ter:**
+
 - `TELEGRAM_BOT_TOKEN=...`
 - `TELEGRAM_CHAT_ID=...`
 
 **Para testar:**
+
 - Inicie o bot
 - Você deve receber mensagem de "BOT INICIADO"
 - Faça um trade manual

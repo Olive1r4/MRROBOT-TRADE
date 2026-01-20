@@ -148,6 +148,7 @@ MRROBOT-FUTURE/
 ## 🔧 Tecnologias Utilizadas
 
 ### Backend
+
 - **Python 3.10+**
 - **FastAPI** - Framework web assíncrono
 - **CCXT** - API unificada de exchanges
@@ -155,18 +156,21 @@ MRROBOT-FUTURE/
 - **Uvicorn** - ASGI server
 
 ### Bibliotecas
+
 - **NumPy & Pandas** - Cálculo de indicadores
 - **httpx** - Cliente HTTP assíncrono (Telegram)
 - **pydantic** - Validação de dados
 - **python-dotenv** - Variáveis de ambiente
 
 ### DevOps
+
 - **Docker & Docker Compose**
 - **GitHub Actions**
 - **systemd**
 - **UFW** - Firewall
 
 ### Monitoramento
+
 - **Supabase Dashboard**
 - **Logs estruturados**
 - **Health checks**
@@ -176,12 +180,12 @@ MRROBOT-FUTURE/
 
 ## 📊 Indicadores Técnicos
 
-| Indicador | Uso | Configuração Padrão |
-|-----------|-----|---------------------|
-| **RSI** | Detectar sobrevenda | Período: 14, Oversold: 30 |
-| **Bollinger Bands** | Volatilidade e extremos | Período: 20, Desvio: 2 |
-| **EMA 200** | Filtro de tendência | Período: 200 |
-| **ATR** | Stop loss dinâmico | Período: 14, Multiplicador: 2.0 |
+| Indicador           | Uso                     | Configuração Padrão             |
+| ------------------- | ----------------------- | ------------------------------- |
+| **RSI**             | Detectar sobrevenda     | Período: 14, Oversold: 30       |
+| **Bollinger Bands** | Volatilidade e extremos | Período: 20, Desvio: 2          |
+| **EMA 200**         | Filtro de tendência     | Período: 200                    |
+| **ATR**             | Stop loss dinâmico      | Período: 14, Multiplicador: 2.0 |
 
 ---
 
@@ -310,7 +314,7 @@ curl http://localhost:8000/stats
 bash scripts/verificar_vps.sh
 
 # Manual (na VPS)
-ssh root@78.46.246.200
+ssh root@49.13.1.177
 # Seguir comandos em COMANDOS_VPS.txt
 ```
 
@@ -318,24 +322,24 @@ ssh root@78.46.246.200
 
 ## 📚 Documentação Disponível
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `README.md` | Documentação completa do projeto |
-| `COMECE_AGORA.md` | Guia de início rápido |
-| `GARANTIA_SEGURANCA.txt` | Explicação sobre MODE=MOCK |
-| `TESTE_SEGURO.md` | Como testar com segurança |
-| `TELEGRAM_QUICKSTART.md` | Configurar Telegram (3 passos) |
-| `TELEGRAM_EXEMPLO.txt` | Exemplos de notificações |
-| `DOCKER_QUICKSTART.md` | Usar Docker rapidamente |
-| `DOCKER_COMPLETO.md` | Guia completo de Docker |
-| `VERIFICAR_VPS.md` | Verificar e gerenciar VPS |
-| `COMANDOS_VPS.txt` | Comandos prontos para VPS |
-| `docs/VPS_SETUP.md` | Setup inicial da VPS |
-| `docs/TELEGRAM_SETUP.md` | Guia completo Telegram |
-| `docs/API_EXAMPLES.md` | Exemplos de uso da API |
-| `docs/ESTRATEGIAS.md` | Estratégias de trading |
-| `docs/TESTES.md` | Como testar o bot |
-| `CONTRIBUTING.md` | Como contribuir |
+| Arquivo                  | Descrição                        |
+| ------------------------ | -------------------------------- |
+| `README.md`              | Documentação completa do projeto |
+| `COMECE_AGORA.md`        | Guia de início rápido            |
+| `GARANTIA_SEGURANCA.txt` | Explicação sobre MODE=MOCK       |
+| `TESTE_SEGURO.md`        | Como testar com segurança        |
+| `TELEGRAM_QUICKSTART.md` | Configurar Telegram (3 passos)   |
+| `TELEGRAM_EXEMPLO.txt`   | Exemplos de notificações         |
+| `DOCKER_QUICKSTART.md`   | Usar Docker rapidamente          |
+| `DOCKER_COMPLETO.md`     | Guia completo de Docker          |
+| `VERIFICAR_VPS.md`       | Verificar e gerenciar VPS        |
+| `COMANDOS_VPS.txt`       | Comandos prontos para VPS        |
+| `docs/VPS_SETUP.md`      | Setup inicial da VPS             |
+| `docs/TELEGRAM_SETUP.md` | Guia completo Telegram           |
+| `docs/API_EXAMPLES.md`   | Exemplos de uso da API           |
+| `docs/ESTRATEGIAS.md`    | Estratégias de trading           |
+| `docs/TESTES.md`         | Como testar o bot                |
+| `CONTRIBUTING.md`        | Como contribuir                  |
 
 ---
 
@@ -419,6 +423,7 @@ bash scripts/verificar_vps.sh
 ## 🆘 Suporte
 
 **Problemas?**
+
 1. Ver logs: `docker-compose logs` ou `sudo journalctl -u scalping-bot -f`
 2. Ver documentação: `README.md` e arquivos em `docs/`
 3. Verificar VPS: `bash scripts/verificar_vps.sh`

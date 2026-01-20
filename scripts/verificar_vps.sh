@@ -3,7 +3,7 @@
 # Script para verificar status completo do bot na VPS
 # Uso: ./scripts/verificar_vps.sh
 
-VPS_IP="78.46.246.200"
+VPS_IP="49.13.1.177"
 VPS_USER="root"
 BOT_DIR="/root/MRROBOT-FUTURE"
 

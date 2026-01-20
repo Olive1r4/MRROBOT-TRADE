@@ -11,15 +11,18 @@ O terminal integrado do Cursor está com um erro temporário. **Solução:** Use
 ### 1️⃣ Abrir Terminal do Mac
 
 **Opção A - Spotlight:**
+
 - Pressione `Cmd + Espaço`
 - Digite: `Terminal`
 - Pressione `Enter`
 
 **Opção B - Finder:**
+
 - Abra o Finder
 - Vá em: `Aplicativos > Utilitários > Terminal`
 
 **Opção C - iTerm2** (se você tem instalado):
+
 - Pressione `Cmd + Espaço`
 - Digite: `iTerm`
 - Pressione `Enter`
@@ -31,7 +34,7 @@ O terminal integrado do Cursor está com um erro temporário. **Solução:** Use
 No terminal que abriu, execute:
 
 ```bash
-ssh root@78.46.246.200
+ssh root@49.13.1.177
 ```
 
 ✅ **Pronto!** Você está conectado na VPS!
@@ -237,6 +240,7 @@ docker-compose restart
 ```
 
 **Como obter:**
+
 1. **Token:** Telegram → @BotFather → `/newbot`
 2. **Chat ID:** Telegram → @userinfobot → `/start`
 
@@ -346,7 +350,7 @@ Crie um alias no seu Mac para facilitar:
 
 ```bash
 # No seu Mac (Terminal local)
-echo 'alias vps="ssh root@78.46.246.200"' >> ~/.zshrc
+echo 'alias vps="ssh root@49.13.1.177"' >> ~/.zshrc
 source ~/.zshrc
 
 # Agora você só precisa digitar:
@@ -368,7 +372,7 @@ Ou pressione: `Ctrl + D`
 ## ✅ RESUMO
 
 1. **Abrir Terminal do Mac** (Cmd + Espaço → Terminal)
-2. **Conectar:** `ssh root@78.46.246.200`
+2. **Conectar:** `ssh root@49.13.1.177`
 3. **Verificar:** Copiar/colar o bloco de verificação
 4. **Se necessário:** Iniciar bot com Docker ou Systemd
 5. **Testar:** Fazer trade manual
@@ -376,6 +380,6 @@ Ou pressione: `Ctrl + D`
 
 ---
 
-**🎯 O problema não é SSH ou permissões - é só usar o Terminal nativo do Mac em vez do terminal integrado do Cursor!** 
+**🎯 O problema não é SSH ou permissões - é só usar o Terminal nativo do Mac em vez do terminal integrado do Cursor!**
 
 **📱 Qualquer dúvida, me avise depois de tentar! 🚀**

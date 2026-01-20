@@ -3,12 +3,12 @@
 # Script para verificar VPS do Mac (duplo clique funciona)
 # Salvo como .command para funcionar no Finder
 
-VPS="root@78.46.246.200"
+VPS="root@49.13.1.177"
 
 echo "╔══════════════════════════════════════════════════════════════════════════════╗"
 echo "║                                                                              ║"
 echo "║                    🔍 VERIFICANDO BOT NA VPS 🔍                              ║"
-echo "║                         78.46.246.200                                        ║"
+echo "║                         49.13.1.177                                        ║"
 echo "║                                                                              ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
@@ -116,7 +116,7 @@ if [ -d /root/MRROBOT-FUTURE ]; then
         echo "   2. Editar .env: nano /root/MRROBOT-FUTURE/.env"
         echo ""
     fi
-    
+
     if ! systemctl is-active --quiet scalping-bot 2>/dev/null && ! docker ps 2>/dev/null | grep -q robot; then
         echo "💡 BOT NÃO ESTÁ RODANDO. Para iniciar:"
         echo ""
@@ -127,7 +127,7 @@ if [ -d /root/MRROBOT-FUTURE ]; then
         echo "      sudo systemctl start scalping-bot"
         echo ""
     fi
-    
+
     if ! curl -s http://localhost:8000/health > /dev/null 2>&1; then
         echo "⚠️  API não está respondendo. Verificar logs:"
         echo "   docker-compose logs -f"
@@ -153,7 +153,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "💡 Para conectar na VPS:"
-echo "   ssh root@78.46.246.200"
+echo "   ssh root@49.13.1.177"
 echo ""
 echo "📚 Ver guia completo:"
 echo "   cat ACESSO_VPS.md"

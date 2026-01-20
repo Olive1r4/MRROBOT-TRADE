@@ -2,7 +2,7 @@
 
 # Script para verificar status do bot na VPS
 
-VPS_IP="78.46.246.200"
+VPS_IP="49.13.1.177"
 VPS_USER="root"
 
 echo "════════════════════════════════════════════════════════════════════════════"
