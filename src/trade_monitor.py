@@ -95,6 +95,7 @@ class TradeMonitor:
 
         # Trades abertos sendo monitorados
         self.open_trades: Dict[str, OpenTrade] = {}
+        self.trades_lock = asyncio.Lock()
 
         # Flag para shutdown gracioso
         self.is_running = True
