@@ -370,13 +370,17 @@ class RiskManager:
                     balance = self.exchange.fetch_balance()
                     # Usar saldo TOTAL (Estratégia baseada na banca total)
                     total_capital = float(balance['USDT']['total'])
+                    # Usar saldo LIVRE para verificar disponibilidade (segurança)
+                    available_capital = float(balance['USDT']['free'])
                 except Exception as e:
                     logger.error(f"❌ Erro ao obter saldo para Position Tuning: {e}")
                     total_capital = 100.0
+                    available_capital = 100.0
             else:
                 # TODO: Obter saldo real do exchange
                 # Por enquanto, usar valor estimado
                 total_capital = 100.0
+                available_capital = 100.0
 
             # POSITION SIZING: 20% do capital como MARGEM
             margin = total_capital * self.config.POSITION_SIZE_PERCENT
@@ -390,14 +394,14 @@ class RiskManager:
             if usdt_amount < MIN_NOTIONAL:
                 logger.warning(f"⚠️ Valor nominal ${usdt_amount:.2f} abaixo do mínimo da Binance ($100). Tentando ajustar...")
 
-                # Verificar se temos saldo suficiente para cobrir o mínimo
+                # Verificar se temos saldo LIVRE suficiente para cobrir o mínimo
                 required_margin = MIN_NOTIONAL / leverage
 
-                if required_margin <= total_capital:
-                    logger.info(f"✅ Ajustando posição para o mínimo aceito: ${MIN_NOTIONAL} (Margem: ${required_margin:.2f})")
+                if required_margin <= available_capital:
+                    logger.info(f"✅ Ajustando posição para o mínimo aceito: ${MIN_NOTIONAL} (Margem Req: ${required_margin:.2f} | Disp: ${available_capital:.2f})")
                     usdt_amount = MIN_NOTIONAL
                 else:
-                    logger.error(f"❌ Saldo insuficiente (${total_capital:.2f}) para atingir valor nominal mínimo de ${MIN_NOTIONAL}")
+                    logger.error(f"❌ Saldo LIVRE insuficiente (${available_capital:.2f}) para atingir mínimo de ${MIN_NOTIONAL}. Trade pode falhar.")
 
             logger.info(f"💰 Position Sizing Sniper ({symbol}):")
             logger.info(f"   Capital Total: ${total_capital:.2f}")
