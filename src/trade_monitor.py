@@ -374,6 +374,11 @@ class TradeMonitor:
                 ) as websocket:
 
                     self.ws_main = websocket
+
+                    # Log de reconexão bem-sucedida
+                    if reconnect_attempts > 0:
+                        logger.info(f\"✅ WebSocket RECONECTADO com sucesso após {reconnect_attempts} tentativa(s)!\")
+
                     reconnect_attempts = 0
 
                     # Assinar símbolos que já estão em monitoramento (em caso de reconexão)
@@ -433,8 +438,12 @@ class TradeMonitor:
             except Exception as e:
                 self.ws_main = None
                 reconnect_attempts += 1
-                wait_time = min(2 ** reconnect_attempts, 30)
-                logger.warning(f"⚠️ Erro no TradeMonitor WebSocket: {e}. Reconectando em {wait_time}s...")
+                wait_time = min(2 ** reconnect_attempts, 10)  # Máximo 10s em vez de 30s
+
+                # Log detalhado sobre o erro
+                logger.error(f"❌ WebSocket desconectado: {type(e).__name__}: {e}")
+                logger.warning(f"🔄 Tentativa {reconnect_attempts} - Reconectando em {wait_time}s...")
+
                 await asyncio.sleep(wait_time)
 
     async def process_price_tick(self, symbol: str, current_price: float):
