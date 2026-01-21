@@ -6,7 +6,7 @@ Verifica condições de entrada A CADA TICK (tempo real)
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Set
 from collections import deque
 from dataclasses import dataclass
@@ -179,7 +179,7 @@ class MarketScanner:
             # Criar MarketState
             self.market_states[symbol] = MarketState(
                 symbol=symbol,
-                last_update=datetime.now(),
+                last_update=datetime.now(timezone.utc),
                 current_price=ohlcv[-1][4],  # Close da última vela
                 candles=deque(ohlcv, maxlen=200)
             )
@@ -410,7 +410,8 @@ class MarketScanner:
             condition_bb = current_price <= state.bb_lower * 1.001  # 0.1% de tolerância
 
             # Log detalhado (a cada 30s para não poluir)
-            time_since_last = (datetime.now() - state.last_update).total_seconds()
+            now = datetime.now(timezone.utc)
+            time_since_last = (now - state.last_update).total_seconds()
             if time_since_last >= 30:
                 status_msg = f"🔍 {symbol} ${current_price:.2f} | RSI: {state.rsi:.2f} {'✅' if condition_rsi else '❌'} | BB: ${state.bb_lower:.2f} {'✅' if condition_bb else '❌'} | EMA: ${state.ema_200:.2f}"
 
@@ -419,15 +420,16 @@ class MarketScanner:
                     status_msg += f" | ⏸️ (Limite: {self.open_trades_count}/{self.config.MAX_OPEN_TRADES} trades)"
 
                 logger.info(status_msg)
-                state.last_update = datetime.now()
+                state.last_update = now
 
             # PRIORIDADE DE SINAL: Verificação de cache local (ultra rápido)
             if self.open_trades_count >= self.config.MAX_OPEN_TRADES:
                 return
 
             # Verificar cooldown após bloqueio
+            now = datetime.now(timezone.utc)
             if symbol in self.blocked_until:
-                if datetime.now() < self.blocked_until[symbol]:
+                if now < self.blocked_until[symbol]:
                     return  # Ainda em cooldown
                 else:
                     del self.blocked_until[symbol]  # Cooldown expirado
@@ -463,7 +465,7 @@ class MarketScanner:
                     logger.warning(f"   • {reason}")
 
                 # Adicionar cooldown de 60s para evitar loop infinito
-                self.blocked_until[symbol] = datetime.now() + timedelta(seconds=60)
+                self.blocked_until[symbol] = datetime.now(timezone.utc) + timedelta(seconds=60)
                 logger.info(f"⏰ Cooldown de 60s ativado para {symbol}")
                 return
 

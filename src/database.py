@@ -2,7 +2,7 @@
 Integração com Supabase para gerenciamento de dados
 """
 from typing import Dict, List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from supabase import create_client, Client
 import logging
 
@@ -147,7 +147,7 @@ class Database:
             # Atualizar trade
             update_data = {
                 'exit_price': exit_price,
-                'exit_time': datetime.now().isoformat(),
+                'exit_time': datetime.now(timezone.utc).isoformat(),
                 'pnl': pnl_net,
                 'pnl_percentage': pnl_percentage,
                 'status': 'closed',
@@ -158,7 +158,7 @@ class Database:
             self.update_trade(trade_id, update_data)
 
             # Atualizar PnL diário
-            self.update_daily_pnl(datetime.now().date(), pnl_net)
+            self.update_daily_pnl(datetime.now(timezone.utc).date(), pnl_net)
 
             logger.info(f"✅ Trade {trade_id} fechado")
             logger.info(f"   Entry: ${entry_price:.4f} | Exit: ${exit_price:.4f}")
@@ -205,7 +205,7 @@ class Database:
         try:
             update_data = {
                 'exit_price': exit_price,
-                'exit_time': datetime.now().isoformat(),
+                'exit_time': datetime.now(timezone.utc).isoformat(),
                 'exit_reason': exit_reason,
                 'pnl': pnl_usdt,
                 'pnl_percentage': pnl_percent * 100,  # Converter para percentual
@@ -285,7 +285,7 @@ class Database:
         """Obtém o PnL de um dia específico"""
         try:
             if not trade_date:
-                trade_date = datetime.now().date()
+                trade_date = datetime.now(timezone.utc).date()
 
             response = self.client.table('daily_stats_mrrobot')\
                 .select('*')\
@@ -343,7 +343,7 @@ class Database:
             self.client.table('daily_stats_mrrobot')\
                 .update({
                     'is_circuit_breaker_active': True,
-                    'circuit_breaker_activated_at': datetime.now().isoformat()
+                    'circuit_breaker_activated_at': datetime.now(timezone.utc).isoformat()
                 })\
                 .eq('trade_date', trade_date.isoformat())\
                 .execute()

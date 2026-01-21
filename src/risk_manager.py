@@ -2,7 +2,7 @@
 Gerenciador de Risco com Guardrails de Segurança
 Implementa: Daily Stop Loss, Max Open Trades, Anti-Whipsaw, Rate Limiter
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Tuple, Optional
 import logging
 
@@ -32,7 +32,7 @@ class RiskManager:
             (is_allowed: bool, reason: str)
         """
         try:
-            today = datetime.now().date()
+            today = datetime.now(timezone.utc).date()
             daily_pnl = self.db.get_daily_pnl(today)
 
             if not daily_pnl:
@@ -127,7 +127,7 @@ class RiskManager:
             if not cooldown_until:
                 return True, "Sem cooldown ativo"
 
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
 
             # Converter para datetime se for string
             if isinstance(cooldown_until, str):
@@ -154,7 +154,7 @@ class RiskManager:
             symbol: Símbolo da moeda
         """
         try:
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             cooldown_until = now + timedelta(seconds=self.config.TRADE_COOLDOWN_SECONDS)
 
             self.db.set_trade_cooldown(symbol, now, cooldown_until)
@@ -172,7 +172,7 @@ class RiskManager:
             (is_allowed: bool, reason: str)
         """
         try:
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             current_minute = now.replace(second=0, microsecond=0)
 
             # Limpar ordens de minutos anteriores
@@ -197,7 +197,7 @@ class RiskManager:
     def register_order(self):
         """Registra uma nova ordem no rate limiter"""
         try:
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             self.orders_in_current_minute.append(now)
             logger.debug(f"📝 Ordem registrada no rate limiter")
         except Exception as e:
