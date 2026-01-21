@@ -135,161 +135,146 @@ async def execute_trade(
         scanner_price: Preço detectado pelo scanner
         scanner_indicators: Indicadores pré-calculados pelo scanner
     """
+    # 1. VALIDAÇÕES DE RISCO
+    validation = risk_manager.validate_trade_entry(symbol)
+
+    if not validation['allowed']:
+        logger.warning(f"❌ Trade bloqueado para {symbol}")
+        for reason in validation['reasons']:
+            logger.warning(f"   {reason}")
+
+        db.log('WARNING', f'Trade bloqueado: {symbol}', {
+            'reasons': validation['reasons']
+        }, symbol=symbol)
+
+        return {
+            'success': False,
+            'message': 'Trade bloqueado por guardrails de segurança',
+            'reasons': validation['reasons']
+        }
+
+    coin_config = validation['coin_config']
+
+    # 2. BLOQUEAR ENTRADAS PARALELAS PARA ESTE SÍMBOLO
+    risk_manager.start_entry(symbol)
+
     try:
-        logger.info(f"🚀 INICIANDO TRADE: {symbol}")
-
-        # 1. VALIDAÇÕES DE RISCO
-        validation = risk_manager.validate_trade_entry(symbol)
-
-        if not validation['allowed']:
-            logger.warning(f"❌ Trade bloqueado para {symbol}")
-            for reason in validation['reasons']:
-                logger.warning(f"   {reason}")
-
-            db.log('WARNING', f'Trade bloqueado: {symbol}', {
-                'reasons': validation['reasons']
-            }, symbol=symbol)
-
-            return {
-                'success': False,
-                'message': 'Trade bloqueado por guardrails de segurança',
-                'reasons': validation['reasons']
+        # 3. OBTER DADOS DO MERCADO (ou usar do scanner)
+        if scanner_validated and scanner_price and scanner_indicators:
+            # Usar dados já validados pelo scanner
+            logger.info(f"📊 Usando dados pré-validados do scanner")
+            current_price = scanner_price
+            signal = {
+                'should_enter': True,
+                'reason': 'Scanner: RSI oversold + BB lower + EMA uptrend',
+                'take_profit': scanner_indicators['take_profit'],
+                'stop_loss': scanner_indicators['stop_loss'],
+                'indicators': scanner_indicators
             }
+            logger.info(f"💰 Preço: ${current_price:.4f} | RSI: {scanner_indicators['rsi']:.2f} | BB: ${scanner_indicators['bb_lower']:.2f} | EMA: ${scanner_indicators['ema_200']:.2f}")
+        else:
+            # Buscar dados normalmente (webhook ou manual)
+            logger.info(f"📊 Obtendo dados de mercado de {symbol}...")
 
-        coin_config = validation['coin_config']
+            current_price = exchange.get_current_price(symbol)
+            ohlcv_data = exchange.fetch_ohlcv(symbol, config.TIMEFRAME, limit=500)
 
-        # 2. BLOQUEAR ENTRADAS PARALELAS PARA ESTE SÍMBOLO
-        risk_manager.start_entry(symbol)
+            logger.info(f"💰 Preço atual: ${current_price:.4f}")
 
-        try:
-            # 3. OBTER DADOS DO MERCADO (ou usar do scanner)
-            if scanner_validated and scanner_price and scanner_indicators:
-                # Usar dados já validados pelo scanner
-                logger.info(f"📊 Usando dados pré-validados do scanner")
-                current_price = scanner_price
-                signal = {
-                    'should_enter': True,
-                    'reason': 'Scanner: RSI oversold + BB lower + EMA uptrend',
-                    'take_profit': scanner_indicators['take_profit'],
-                    'stop_loss': scanner_indicators['stop_loss'],
-                    'indicators': scanner_indicators
+            # 3. ANÁLISE TÉCNICA
+            logger.info(f"📈 Analisando indicadores técnicos...")
+
+            signal = signal_analyzer.analyze_entry_signal(symbol, ohlcv_data, current_price)
+
+            if not signal['should_enter']:
+                logger.info(f"⏸️ Sinal de entrada NÃO confirmado para {symbol}")
+                logger.info(f"   Razão: {signal['reason']}")
+
+                db.log('INFO', f'Sinal de entrada negado: {symbol}', {
+                    'reason': signal['reason'],
+                    'indicators': signal['indicators']
+                }, symbol=symbol)
+
+                return {
+                    'success': False,
+                    'message': 'Sinal de entrada não confirmado',
+                    'reason': signal['reason'],
+                    'indicators': signal['indicators']
                 }
-                logger.info(f"💰 Preço: ${current_price:.4f} | RSI: {scanner_indicators['rsi']:.2f} | BB: ${scanner_indicators['bb_lower']:.2f} | EMA: ${scanner_indicators['ema_200']:.2f}")
-            else:
-                # Buscar dados normalmente (webhook ou manual)
-                logger.info(f"📊 Obtendo dados de mercado de {symbol}...")
 
-                current_price = exchange.get_current_price(symbol)
-                ohlcv_data = exchange.fetch_ohlcv(symbol, config.TIMEFRAME, limit=500)
+        logger.info(f"✅ Sinal de entrada CONFIRMADO!")
 
-                logger.info(f"💰 Preço atual: ${current_price:.4f}")
+        # 4. CALCULAR TAMANHO DA POSIÇÃO
+        usdt_amount, leverage = risk_manager.calculate_position_size(
+            symbol, current_price, coin_config
+        )
 
-                # 3. ANÁLISE TÉCNICA
-                logger.info(f"📈 Analisando indicadores técnicos...")
+        # 5. PREPARAR ORDEM
+        quantity, total_value = exchange.calculate_order_size(symbol, usdt_amount, current_price)
 
-                signal = signal_analyzer.analyze_entry_signal(symbol, ohlcv_data, current_price)
+        logger.info(f"💼 Preparando ordem: {quantity} {symbol} (${total_value:.2f}) | {leverage}x | TP: ${signal['take_profit']:.4f} | SL: ${signal['stop_loss']:.4f}")
 
-                if not signal['should_enter']:
-                    logger.info(f"⏸️ Sinal de entrada NÃO confirmado para {symbol}")
-                    logger.info(f"   Razão: {signal['reason']}")
+        # 6. CONFIGURAR EXCHANGE
+        exchange.set_leverage(symbol, leverage)
+        exchange.set_margin_mode(symbol, 'isolated')
 
-                    db.log('INFO', f'Sinal de entrada negado: {symbol}', {
-                        'reason': signal['reason'],
-                        'indicators': signal['indicators']
-                    }, symbol=symbol)
+        # 7. EXECUTAR ORDEM DE ENTRADA
+        logger.info(f"🔄 Executando ordem de compra...")
 
-                    return {
-                        'success': False,
-                        'message': 'Sinal de entrada não confirmado',
-                        'reason': signal['reason'],
-                        'indicators': signal['indicators']
-                    }
+        order_entry = exchange.create_market_buy_order(symbol, quantity, current_price)
 
-            logger.info(f"✅ Sinal de entrada CONFIRMADO!")
+        # Registrar no rate limiter
+        risk_manager.register_order()
 
-            # 4. CALCULAR TAMANHO DA POSIÇÃO
-            usdt_amount, leverage = risk_manager.calculate_position_size(
-                symbol, current_price, coin_config
-            )
+        # 8. SALVAR NO BANCO DE DADOS
+        trade_data = {
+            'symbol': symbol,
+            'side': 'buy',
+            'entry_price': current_price,
+            'quantity': quantity,
+            'leverage': leverage,
+            'target_price': signal['take_profit'],
+            'stop_loss_price': signal['stop_loss'],
+            'status': 'open',
+            'mode': config.MODE
+        }
 
-            # 5. PREPARAR ORDEM
-            # O usdt_amount agora já é o Valor Nominal (Margem * Alavancagem)
-            quantity, total_value = exchange.calculate_order_size(symbol, usdt_amount, current_price)
+        trade_id = db.create_trade(trade_data)
 
-            logger.info(f"💼 Preparando ordem: {quantity} {symbol} (${total_value:.2f}) | {leverage}x | TP: ${signal['take_profit']:.4f} | SL: ${signal['stop_loss']:.4f}")
+        logger.info(f"✅ Trade criado com ID: {trade_id}")
 
-            # 6. CONFIGURAR EXCHANGE
-            exchange.set_leverage(symbol, leverage)
-            exchange.set_margin_mode(symbol, 'isolated')
+        db.log('INFO', f'Trade aberto: {symbol}', {
+            'trade_id': trade_id,
+            'entry_price': current_price,
+            'quantity': quantity,
+            'indicators': signal['indicators']
+        }, symbol=symbol, trade_id=trade_id)
 
-            # 7. EXECUTAR ORDEM DE ENTRADA
-            logger.info(f"🔄 Executando ordem de compra...")
+        # Notificar abertura via Telegram
+        await telegram.notify_trade_open(trade_data, signal)
 
-            order_entry = exchange.create_market_buy_order(symbol, quantity, current_price)
+        logger.info(f"✅ TRADE EXECUTADO COM SUCESSO! ID: {trade_id}")
 
-            # Registrar no rate limiter
-            risk_manager.register_order()
+        return {
+            'success': True,
+            'message': 'Trade executado com sucesso',
+            'trade_id': trade_id,
+            'symbol': symbol,
+            'entry_price': current_price,
+            'quantity': quantity,
+            'target_price': signal['take_profit'],
+            'stop_loss': signal['stop_loss'],
+            'indicators': signal['indicators']
+        }
 
-            # 8. SALVAR NO BANCO DE DADOS
-            # Campos necessários para o bot funcionar e monitorar
-            trade_data = {
-                'symbol': symbol,
-                'side': 'buy',
-                'entry_price': current_price,
-                'quantity': quantity,
-                'leverage': leverage,
-                'target_price': signal['take_profit'],
-                'stop_loss_price': signal['stop_loss'],
-                'status': 'open',
-                'mode': config.MODE
-            }
+    except Exception as e:
+        logger.error(f"❌ Erro ao executar trade: {str(e)}", exc_info=True)
+        db.log('ERROR', f'Erro ao executar trade: {symbol}', {'error': str(e)}, symbol=symbol)
+        return {'success': False, 'message': f'Erro ao executar trade: {str(e)}'}
 
-            trade_id = db.create_trade(trade_data)
-
-            logger.info(f"✅ Trade criado com ID: {trade_id}")
-
-            db.log('INFO', f'Trade aberto: {symbol}', {
-                'trade_id': trade_id,
-                'entry_price': current_price,
-                'quantity': quantity,
-                'indicators': signal['indicators']
-            }, symbol=symbol, trade_id=trade_id)
-
-            # Notificar abertura via Telegram
-            await telegram.notify_trade_open(trade_data, signal)
-
-            logger.info(f"✅ TRADE EXECUTADO COM SUCESSO! ID: {trade_id}")
-
-            # 9. O TRADE MONITOR (em background) irá detectar este novo trade
-            # automaticamente em até 5 segundos via banco de dados.
-
-            return {
-                'success': True,
-                'message': 'Trade executado com sucesso',
-                'trade_id': trade_id,
-                'symbol': symbol,
-                'entry_price': current_price,
-                'quantity': quantity,
-                'target_price': signal['take_profit'],
-                'stop_loss': signal['stop_loss'],
-                'indicators': signal['indicators']
-            }
-
-        except Exception as e:
-            logger.error(f"❌ Erro ao executar trade: {str(e)}", exc_info=True)
-
-            db.log('ERROR', f'Erro ao executar trade: {symbol}', {
-                'error': str(e)
-            }, symbol=symbol)
-
-            return {
-                'success': False,
-                'message': f'Erro ao executar trade: {str(e)}'
-            }
-
-        finally:
-            # LIBERAR TRAVA DE ENTRADA
-            risk_manager.end_entry(symbol)
+    finally:
+        # LIBERAR TRAVA DE ENTRADA
+        risk_manager.end_entry(symbol)
 
 
 
