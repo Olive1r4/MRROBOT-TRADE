@@ -198,11 +198,6 @@ class RiskManager:
         except:
             return timestamp_str
 
-            logger.info(f"⏱️ Cooldown definido para {symbol} até {cooldown_until.strftime('%H:%M:%S')}")
-
-        except Exception as e:
-            logger.error(f"❌ Erro ao definir trade cooldown: {str(e)}")
-
     def check_rate_limit(self) -> Tuple[bool, str]:
         """
         Verifica se o rate limit de ordens por minuto foi excedido
