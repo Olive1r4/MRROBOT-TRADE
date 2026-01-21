@@ -99,6 +99,11 @@ async def startup_event():
         # Enviar notificação de startup
         await telegram.notify_startup(config)
 
+        # WARMUP DE SEGURANÇA: Aguardar 5 minutos antes de iniciar scanner
+        logger.info("⏳ Iniciando Warmup de 5 minutos para estabilização de mercado...")
+        await asyncio.sleep(300)
+        logger.info("✅ Warmup concluído. Iniciando sistemas de trading.")
+
         # Iniciar MARKET SCANNER em background (detecta entradas tick-by-tick)
         if config.ENABLE_SCANNER:
             from src.market_scanner import start_market_scanner
