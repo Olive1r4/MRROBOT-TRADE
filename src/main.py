@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 import uvicorn
 
 from src.config import get_config
@@ -298,7 +298,7 @@ async def root():
         'version': '1.0.0',
         'status': 'online',
         'mode': config.MODE,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -326,7 +326,7 @@ async def health_check():
                 'total_trades': stats.get('total_trades', 0),
                 'win_rate': stats.get('win_rate', 0)
             },
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         logger.error(f"❌ Health check failed: {str(e)}")
@@ -335,7 +335,7 @@ async def health_check():
             content={
                 'status': 'unhealthy',
                 'error': str(e),
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
         )
 
@@ -383,7 +383,7 @@ async def webhook(
             'message': 'Sinal recebido e processamento iniciado',
             'symbol': signal.symbol,
             'action': signal.action,
-            'received_at': datetime.now().isoformat()
+            'received_at': datetime.now(timezone.utc).isoformat()
         }
 
     except HTTPException:
