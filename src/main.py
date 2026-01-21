@@ -164,18 +164,17 @@ async def execute_trade(
         try:
             # 3. OBTER DADOS DO MERCADO (ou usar do scanner)
             if scanner_validated and scanner_price and scanner_indicators:
-                # ...
-            # Usar dados já validados pelo scanner
-            logger.info(f"📊 Usando dados pré-validados do scanner")
-            current_price = scanner_price
-            signal = {
-                'should_enter': True,
-                'reason': 'Scanner: RSI oversold + BB lower + EMA uptrend',
-                'take_profit': scanner_indicators['take_profit'],
-                'stop_loss': scanner_indicators['stop_loss'],
-                'indicators': scanner_indicators
-            }
-            logger.info(f"💰 Preço: ${current_price:.4f} | RSI: {scanner_indicators['rsi']:.2f} | BB: ${scanner_indicators['bb_lower']:.2f} | EMA: ${scanner_indicators['ema_200']:.2f}")
+                # Usar dados já validados pelo scanner
+                logger.info(f"📊 Usando dados pré-validados do scanner")
+                current_price = scanner_price
+                signal = {
+                    'should_enter': True,
+                    'reason': 'Scanner: RSI oversold + BB lower + EMA uptrend',
+                    'take_profit': scanner_indicators['take_profit'],
+                    'stop_loss': scanner_indicators['stop_loss'],
+                    'indicators': scanner_indicators
+                }
+                logger.info(f"💰 Preço: ${current_price:.4f} | RSI: {scanner_indicators['rsi']:.2f} | BB: ${scanner_indicators['bb_lower']:.2f} | EMA: ${scanner_indicators['ema_200']:.2f}")
         else:
             # Buscar dados normalmente (webhook ou manual)
             logger.info(f"📊 Obtendo dados de mercado de {symbol}...")
