@@ -375,8 +375,33 @@ class TradeMonitor:
 
                     logger.info("✅ Trade Monitor WebSocket conectado!")
 
+
+                    # Tarefa HEARTBEAT: Verificar inscrições a cada 60s
+                    last_check = datetime.now()
+
                     async for message in websocket:
                         try:
+                            # Heartbeat de assinaturas
+                            if (datetime.now() - last_check).total_seconds() > 60:
+                                last_check = datetime.now()
+                                current_symbols = set(t.symbol for t in self.open_trades.values())
+                                missing_streams = []
+
+                                for symbol in current_symbols:
+                                    stream = f"{symbol.lower()}@miniTicker"
+                                    if stream not in self.subscribed_streams:
+                                        missing_streams.append(stream)
+
+                                if missing_streams:
+                                    logger.warning(f"⚠️ Detectadas {len(missing_streams)} inscrições perdidas. Re-assinando...")
+                                    msg = {
+                                        "method": "SUBSCRIBE",
+                                        "params": missing_streams,
+                                        "id": int(datetime.now().timestamp())
+                                    }
+                                    await websocket.send(json.dumps(msg))
+                                    self.subscribed_streams.update(missing_streams)
+
                             data = json.loads(message)
 
                             if "stream" in data and "data" in data:
