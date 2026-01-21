@@ -73,9 +73,10 @@ class RiskManager:
             # Em caso de erro, bloquear por segurança
             return False, f"Erro ao verificar stop loss diário: {str(e)}"
 
-    def check_max_open_trades(self) -> Tuple[bool, str]:
+    def check_max_open_trades(self, symbol: Optional[str] = None) -> Tuple[bool, str]:
         """
         Verifica se o número máximo de trades abertos foi atingido
+        e se já existe um trade aberto para o mesmo símbolo.
 
         Returns:
             (is_allowed: bool, reason: str)
@@ -84,6 +85,14 @@ class RiskManager:
             open_trades = self.db.get_open_trades()
             open_count = len(open_trades)
 
+            # 1. Verificar se já existe trade aberto para ESTE símbolo
+            if symbol:
+                for trade in open_trades:
+                    if trade['symbol'] == symbol:
+                        logger.warning(f"⚠️ Já existe um trade aberto para {symbol}")
+                        return False, f"Trade já aberto para {symbol}"
+
+            # 2. Verificar limite global
             if open_count >= self.config.MAX_OPEN_TRADES:
                 logger.warning(f"⚠️ Máximo de trades abertos atingido: {open_count}/{self.config.MAX_OPEN_TRADES}")
                 symbols = [trade['symbol'] for trade in open_trades]
@@ -255,7 +264,7 @@ class RiskManager:
             allowed = False
 
         # 3. Verificar max open trades
-        max_trades_ok, max_trades_reason = self.check_max_open_trades()
+        max_trades_ok, max_trades_reason = self.check_max_open_trades(symbol)
         reasons.append(f"Open Trades: {max_trades_reason}")
         if not max_trades_ok:
             allowed = False
