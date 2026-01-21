@@ -428,8 +428,11 @@ class TradeMonitor:
                     # VERIFICAR TIME-EXIT (45 minutos)
                     duration_minutes = (now - trade.entry_time).total_seconds() / 60
                     if duration_minutes >= 45:
-                        if abs(trade.pnl_percent) <= 0.001:
-                            logger.info(f"⏳ TIME-EXIT TRIGGER: {symbol} atingiu {duration_minutes:.1f} min com PnL neutro ({trade.pnl_percent*100:+.2f}%).")
+                        # ESTRATÉGIA DE ROTAÇÃO DE CAPITAL:
+                        # Se passou de 45 minutos e o trade está no lucro (ou neutro), fecha.
+                        # Objetivo: Liberar slot para novas oportunidades com maior momentum.
+                        if trade.pnl_percent >= 0:
+                            logger.info(f"⏳ TIME-EXIT FORCE: {symbol} atingiu {duration_minutes:.1f} min com PnL positivo ({trade.pnl_percent*100:+.2f}%). Rotacionando capital...")
                             trade.is_closing = True
                             trades_to_close.append((trade, "TIME_EXIT"))
                             continue
