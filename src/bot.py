@@ -10,12 +10,13 @@ from telegram.error import TelegramError
 
 # Configure Logging
 logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=getattr(logging, Config.LOG_LEVEL)
 )
 
 # Silence noisy HTTP logs from libraries
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("postgrest").setLevel(logging.WARNING)
 
 class MrRobotTrade:
