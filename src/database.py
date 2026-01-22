@@ -77,3 +77,12 @@ class Database:
         except Exception as e:
             logging.error(f"Error fetching active markets: {e}")
             return []
+
+    def log_system_error(self, log_data: dict):
+        """Log system errors to the database."""
+        try:
+            db = self.get_client()
+            db.table('system_logs').insert(log_data).execute()
+        except:
+            # We don't use logging.error here to avoid infinite loops if DB is down
+            pass

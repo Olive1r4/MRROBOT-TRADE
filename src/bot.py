@@ -5,6 +5,7 @@ from src.exchange import Exchange
 from src.database import Database
 from src.strategy import Strategy
 from src.risk_manager import RiskManager
+from src.logger_handler import SupabaseHandler
 from telegram import Bot
 from telegram.error import TelegramError
 
@@ -28,6 +29,10 @@ class MrRobotTrade:
         self.running = True
         self.current_trade = None
         self.tg_bot = None
+
+        # Add Supabase Error Handler
+        db_handler = SupabaseHandler(self.db)
+        logging.getLogger().addHandler(db_handler)
 
         if Config.TELEGRAM_BOT_TOKEN:
             self.tg_bot = Bot(token=Config.TELEGRAM_BOT_TOKEN)
