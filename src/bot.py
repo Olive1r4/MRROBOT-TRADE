@@ -4,6 +4,7 @@ from src.config import Config
 from src.exchange import Exchange
 from src.database import Database
 from src.strategy import Strategy
+from src.risk_manager import RiskManager
 from telegram import Bot
 from telegram.error import TelegramError
 
@@ -18,6 +19,7 @@ class MrRobotTrade:
         self.exchange = Exchange()
         self.db = Database()
         self.strategy = Strategy()
+        self.risk_manager = RiskManager()
         self.running = True
         self.current_trade = None
         self.tg_bot = None
@@ -67,6 +69,13 @@ class MrRobotTrade:
 
         while self.running:
             try:
+                # 0. Check Kill Switch (Global Safety)
+                if not self.risk_manager.check_kill_switch():
+                    logging.critical("🚨 System halted by Kill Switch")
+                    await self.send_notification("🚨 **KILL SWITCH ACTIVATED**\nTrading halted for safety.")
+                    await asyncio.sleep(300)  # Wait 5 minutes before checking again
+                    continue
+
                 # 1. Manage Existing Trade (Global Single Trade Rule)
                 if self.current_trade:
                     # Fetch data only for the active symbol
@@ -127,12 +136,24 @@ class MrRobotTrade:
         if signal == "LONG":
             logging.info(f"SIGNAL DETECTED ({symbol}): {signal} at {current_price}")
 
-            # 1. Calculate Size
+            # 1. Risk Checks
+            # 1.1 Check Cooldown
+            if not self.risk_manager.check_cooldown(symbol):
+                logging.warning(f"Entry blocked: {symbol} is in cooldown period")
+                return False
+
+            # 1.2 Calculate Size
             balance_info = await self.exchange.get_balance()
             available_balance = float(balance_info['free'])
 
             if available_balance < 10:
                 logging.warning(f"Insufficient balance: {available_balance}")
+                return False
+
+            # 1.3 Check Daily Loss Limit
+            if not self.risk_manager.check_daily_loss(available_balance):
+                logging.critical("Entry blocked: Daily loss limit exceeded")
+                await self.send_notification("🚨 **DAILY LOSS LIMIT EXCEEDED**\nKill Switch activated.")
                 return False
 
             # Use dynamic leverage from market settings
@@ -143,6 +164,12 @@ class MrRobotTrade:
                  await self.exchange.set_leverage(leverage, symbol)
 
             amount = self.exchange.calculate_position_size(available_balance, current_price, leverage)
+
+            # 1.4 Final Validation
+            is_valid, error_msg = self.risk_manager.validate_entry(symbol, leverage, amount, available_balance, current_price)
+            if not is_valid:
+                logging.error(f"Entry validation failed: {error_msg}")
+                return False
 
             # 2. Execute Order
             order = await self.exchange.create_order(symbol, signal, amount)
