@@ -27,7 +27,7 @@ class Exchange:
         self.paper_balance = self._init_paper_balance()
 
     def _init_paper_balance(self):
-        """Initialize paper balance from DB or Config."""
+        """Initialize balance logging and paper values."""
         if self.mode == 'PAPER':
             last_balance = self.db.get_latest_paper_balance()
             if last_balance is not None:
@@ -35,7 +35,6 @@ class Exchange:
                 return last_balance
             else:
                 logging.info(f"Initializing new PAPER balance: ${Config.INITIAL_PAPER_BALANCE}")
-                # Log initial balance to history
                 self.db.log_wallet({
                     'total_balance': Config.INITIAL_PAPER_BALANCE,
                     'available_balance': Config.INITIAL_PAPER_BALANCE,

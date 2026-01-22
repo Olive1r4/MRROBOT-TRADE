@@ -73,8 +73,23 @@ class MrRobotTrade:
             logging.error(f"Error loading open trades: {e}")
 
     async def run(self):
-        start_msg = f"🚀 **MrRobot Trade Started**\nMode: `{Config.TRADING_MODE}`\nSymbol check: Active Settings"
-        logging.info(f"Starting MrRobot Trade [{Config.TRADING_MODE}]")
+        # Initial Wallet Check
+        balance_info = await self.exchange.get_balance()
+        total_balance = float(balance_info['total'])
+
+        # Log to DB History for LIVE mode tracking
+        self.db.log_wallet({
+            'total_balance': total_balance,
+            'available_balance': float(balance_info['free']),
+            'mode': Config.TRADING_MODE
+        })
+
+        start_msg = (
+            f"🚀 **MrRobot Trade Started**\n"
+            f"Mode: `{Config.TRADING_MODE}`\n"
+            f"Balance: `${total_balance:.2f} USDT`"
+        )
+        logging.info(f"Starting MrRobot Trade [{Config.TRADING_MODE}] - Balance: ${total_balance:.2f}")
         await self.send_notification(start_msg)
 
         while self.running:
