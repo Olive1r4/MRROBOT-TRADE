@@ -113,6 +113,20 @@ class MrRobotTrade:
                         # Check Entry
                         entered = await self.look_for_entry(df, current_price, market)
 
+                        # Heartbeat Log - Show monitoring activity
+                        if not entered:
+                            last_row = df.iloc[-1]
+                            ema9 = last_row.get('ema_fast', 0)
+                            ema21 = last_row.get('ema_slow', 0)
+                            supertrend = last_row.get('supertrend', 0)
+                            st_direction = "UP" if current_price > supertrend else "DOWN"
+
+                            logging.info(
+                                f"[{symbol}] Price: {current_price:.2f} | "
+                                f"EMA9: {ema9:.2f} / EMA21: {ema21:.2f} | "
+                                f"SuperTrend: {st_direction} | Status: Monitoring"
+                            )
+
                         if entered:
                             # SINGLE TRADE RULE: Stop scanning once we enter a trade
                             break
