@@ -394,14 +394,28 @@ class RiskManager:
             if usdt_amount < MIN_NOTIONAL:
                 logger.warning(f"⚠️ Valor nominal ${usdt_amount:.2f} abaixo do mínimo da Binance ($100). Tentando ajustar...")
 
-                # Verificar se temos saldo LIVRE suficiente para cobrir o mínimo
+                # Verificar se temos saldo LIVRE suficiente para cobrir o mínimo + buffer de segurança (2%)
                 required_margin = MIN_NOTIONAL / leverage
+                safety_buffer = required_margin * 1.02 # 2% extra para evitar erros de arredondamento
 
-                if required_margin <= available_capital:
+                if safety_buffer <= available_capital:
                     logger.info(f"✅ Ajustando posição para o mínimo aceito: ${MIN_NOTIONAL} (Margem Req: ${required_margin:.2f} | Disp: ${available_capital:.2f})")
                     usdt_amount = MIN_NOTIONAL
                 else:
-                    logger.error(f"❌ Saldo LIVRE insuficiente (${available_capital:.2f}) para atingir mínimo de ${MIN_NOTIONAL}. Trade pode falhar.")
+                    logger.error(f"❌ Saldo LIVRE insuficiente (${available_capital:.2f}) para atingir mínimo de ${MIN_NOTIONAL} + Buffer. Trade cancelado.")
+                    return 0.0, leverage
+
+            # Verificação final de segurança: Se o position size calculado for maior que o saldo disponível * alavancagem
+            # Isso evita o erro -2019 se a regra de 20% for maior que o saldo livre real
+            max_possible_notional = available_capital * leverage * 0.98 # 98% do poder de compra
+
+            if usdt_amount > max_possible_notional:
+                logger.warning(f"⚠️ Reduzindo posição de ${usdt_amount:.2f} para ${max_possible_notional:.2f} (Restrição de Saldo Livre)")
+                usdt_amount = max_possible_notional
+
+            if usdt_amount < 10.0: # Limite mínimo absoluto (abaixo disso nem tenta enviar)
+                 logger.error(f"❌ Valor da ordem muito baixo (${usdt_amount:.2f}). Cancelando.")
+                 return 0.0, leverage
 
             logger.info(f"💰 Position Sizing Sniper ({symbol}):")
             logger.info(f"   Capital Total: ${total_capital:.2f}")

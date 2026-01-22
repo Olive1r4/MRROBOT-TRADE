@@ -214,6 +214,15 @@ async def execute_trade(
             symbol, current_price, coin_config
         )
 
+        if usdt_amount <= 0:
+            logger.error("❌ Trade cancelado proativamente: Posição zerada (Saldo insuficiente?)")
+            return {
+                'success': False,
+                'message': 'Saldo insuficiente para abrir posição',
+                'reason': 'INSUFFICIENT_FUNDS',
+                'indicators': signal['indicators']
+            }
+
         # 5. PREPARAR ORDEM
         quantity, total_value = exchange.calculate_order_size(symbol, usdt_amount, current_price)
 
