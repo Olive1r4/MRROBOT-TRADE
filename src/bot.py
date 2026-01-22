@@ -14,6 +14,10 @@ logging.basicConfig(
     level=getattr(logging, Config.LOG_LEVEL)
 )
 
+# Silence noisy HTTP logs from libraries
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("postgrest").setLevel(logging.WARNING)
+
 class MrRobotTrade:
     def __init__(self):
         self.exchange = Exchange()
