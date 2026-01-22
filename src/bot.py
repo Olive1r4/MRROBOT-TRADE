@@ -239,28 +239,60 @@ class MrRobotTrade:
         return False
 
     async def manage_trade(self, df, current_price):
-        # 1. Check Technical Exit
-        should_exit, reason = self.strategy.check_exit(df, self.current_trade['side'])
-
-        # 2. Check Stop Loss (Dynamic)
+        symbol = self.current_trade['symbol']
+        side = self.current_trade['side']
         entry_price = float(self.current_trade['entry_price'])
+        # Cálculo de PnL % (Assume LONG por enquanto conforme look_for_entry)
         pnl_pct = (current_price - entry_price) / entry_price
 
-        # Retrieve SL from settings or default 5%
-        # Note: current_trade might not have 'market_settings' if loaded from DB freshly.
-        # Ideally we fetch it, but for simplicity let's assume default or simple query if missing.
-        stop_loss_pct = 0.05
-        # If we had the settings loaded:
+        # 1. Recuperar Dados
+        initial_stop_percent = 0.05
         if 'market_settings' in self.current_trade:
-             stop_loss_pct = float(self.current_trade['market_settings'].get('stop_loss_percent', 0.05))
+             initial_stop_percent = float(self.current_trade['market_settings'].get('stop_loss_percent', 0.05))
 
-        # SL condition for LONG
-        if pnl_pct <= -stop_loss_pct:
+        # Trailing Stop Price from strategy_data
+        strategy_data = self.current_trade.get('strategy_data', {})
+        if strategy_data is None: strategy_data = {}
+        trailing_stop_price = strategy_data.get('trailing_stop_price')
+
+        should_exit = False
+        exit_reason = ""
+
+        # 2. Verificar Saída de Emergência (Stop Loss Inicial)
+        if trailing_stop_price is None:
+            if pnl_pct <= -initial_stop_percent:
+                should_exit = True
+                exit_reason = f"Initial Stop Loss (-{initial_stop_percent*100}%)"
+
+        # 3. Atualizar/Verificar Trailing Stop (Lucro)
+        # Ativação: Se lucrou >= 3%
+        if pnl_pct >= 0.03:
+            new_stop = current_price * (1 - 0.03) # Margem de 3%
+
+            # Lógica da Catraca: Só move se for para subir o stop
+            if trailing_stop_price is None or new_stop > trailing_stop_price:
+                trailing_stop_price = new_stop
+                strategy_data['trailing_stop_price'] = trailing_stop_price
+                self.current_trade['strategy_data'] = strategy_data
+
+                # Persistência no DB
+                self.db.update_trade(self.current_trade['id'], {'strategy_data': strategy_data})
+                logging.info(f"[{symbol}] Trailing Stop movido para {trailing_stop_price:.2f}")
+
+        # Execução do Trailing Stop
+        if trailing_stop_price is not None and current_price < trailing_stop_price:
             should_exit = True
-            reason = f"Stop Loss (-{stop_loss_pct*100}%)"
+            exit_reason = f"Trailing Stop Hit ({trailing_stop_price:.2f})"
+
+        # 4. Saída Técnica (Cruzamento de Médias)
+        if not should_exit:
+            technical_exit, tech_reason = self.strategy.check_exit(df, side)
+            if technical_exit:
+                should_exit = True
+                exit_reason = tech_reason
 
         if should_exit:
-            await self.close_trade(reason, current_price)
+            await self.close_trade(exit_reason, current_price)
 
     async def close_trade(self, reason, current_price):
         logging.info(f"Closing trade. Reason: {reason} | Price: {current_price}")
