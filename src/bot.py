@@ -292,6 +292,14 @@ class MrRobotTrade:
 
                 # Persistência no DB
                 self.db.update_trade(self.current_trade['id'], {'strategy_data': strategy_data})
+
+                msg = (
+                    f"⚙️ **Trailing Stop Atualizado**\n"
+                    f"Ativo: `{symbol}`\n"
+                    f"Novo Stop: `{trailing_stop_price:.2f}`\n"
+                    f"Lucro Atual: `{pnl_pct*100:.2f}%`"
+                )
+                await self.send_notification(msg)
                 logging.info(f"[{symbol}] Trailing Stop movido para {trailing_stop_price:.2f}")
 
         # Execução do Trailing Stop
