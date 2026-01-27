@@ -94,12 +94,16 @@ class Exchange:
             logging.error("Cannot create order: Failed to get price.")
             return None
 
+        # Map signals to CCXT sides
+        side_map = {'LONG': 'buy', 'SHORT': 'sell', 'BUY': 'buy', 'SELL': 'sell'}
+        ccxt_side = side_map.get(side.upper(), side.lower())
+
         if self.mode == 'LIVE':
             try:
                 order = await self.client.create_order(
                     symbol=symbol,
                     type='MARKET',
-                    side=side.lower(),
+                    side=ccxt_side,
                     amount=amount
                 )
                 return order
@@ -108,7 +112,7 @@ class Exchange:
                 return None
         else:
             # Paper Mode Simulation
-            logging.info(f"PAPER EXECUTION: {side} {amount} {symbol} @ {current_price}")
+            logging.info(f"PAPER EXECUTION: {ccxt_side.upper()} {amount} {symbol} @ {current_price}")
 
             # Create a fake order object structure similar to CCXT
             fake_order = {
