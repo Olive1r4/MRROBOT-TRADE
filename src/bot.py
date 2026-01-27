@@ -249,16 +249,20 @@ class MrRobotTrade:
                     self.current_trade['market_settings'] = market_settings
 
                 # Notify
+                side_icon = "🟢" if signal.upper() in ['LONG', 'BUY'] else "🔴"
+                notional = float(order.get('amount', amount)) * float(order.get('average', current_price))
+
                 msg = (
-                    f"✅ **Trade OPENED**\n"
-                    f"Symbol: `{symbol}`\n"
-                    f"Side: `{signal}`\n"
-                    f"Entry: `{order.get('average', current_price)}`\n"
-                    f"Amt: `{order.get('amount', amount)}`\n"
-                    f"Lev: `{leverage}x`"
+                    f"🚀 **NOVA OPERAÇÃO ABERTA**\n\n"
+                    f"{side_icon} **ATIVO:** `{symbol}`\n"
+                    f"⚡ **LADO:** `{signal}`\n"
+                    f"💰 **ENTRADA:** `${float(order.get('average', current_price)):,.2f}`\n"
+                    f"📊 **VALOR:** `${notional:,.2f} USDT`\n"
+                    f"⚙️ **ALAVANCAGEM:** `{leverage}x`\n\n"
+                    f"🎯 *Monitorando Trailing Stop: 1.5%*"
                 )
                 if not res:
-                    msg += "\n⚠️ **DATABASE LOGGING FAILED!** Check manual positions."
+                    msg += "\n\n⚠️ **DATABASE ERROR:** Posição aberta mas não registrada no DB!"
 
                 await self.send_notification(msg)
                 return True # Signal that we entered
@@ -270,6 +274,10 @@ class MrRobotTrade:
         entry_price = float(self.current_trade['entry_price'])
         # Cálculo de PnL % (Assume LONG por enquanto conforme look_for_entry)
         pnl_pct = (current_price - entry_price) / entry_price
+
+        # Heartbeat Log while managing
+        ts_status = f"{float(self.current_trade.get('strategy_data', {}).get('trailing_stop_price', 0)):.2f}" if self.current_trade.get('strategy_data', {}).get('trailing_stop_price') else "OFF"
+        logging.info(f"[{symbol}] MANAGING | Price: {current_price:.2f} | PnL: {pnl_pct*100:.2f}% | TS: {ts_status}")
 
         # 1. Recuperar Dados
         initial_stop_percent = 0.05
