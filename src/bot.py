@@ -85,9 +85,9 @@ class MrRobotTrade:
         })
 
         start_msg = (
-            f"🚀 **MrRobot Trade Started**\n"
-            f"Mode: `{Config.TRADING_MODE}`\n"
-            f"Balance: `${total_balance:.2f} USDT`"
+            f"🤖 **MrRobot Trade Inicializado**\n\n"
+            f"📍 **Modo:** {Config.TRADING_MODE}\n"
+            f"💵 **Saldo Inicial:** ${total_balance:,.2f} USDT"
         )
         logging.info(f"Starting MrRobot Trade [{Config.TRADING_MODE}] - Balance: ${total_balance:.2f}")
         await self.send_notification(start_msg)
@@ -313,10 +313,10 @@ class MrRobotTrade:
                 self.db.update_trade(self.current_trade['id'], {'strategy_data': strategy_data})
 
                 msg = (
-                    f"⚙️ **Trailing Stop Atualizado**\n"
-                    f"Ativo: `{symbol}`\n"
-                    f"Novo Stop: `{trailing_stop_price:.2f}`\n"
-                    f"Lucro Atual: `{pnl_pct*100:.2f}%`"
+                    f"⚙️ **TRAILING STOP ATUALIZADO**\n\n"
+                    f"🔹 **Ativo:** {symbol}\n"
+                    f"🛡️ **Novo Stop:** ${trailing_stop_price:,.2f}\n"
+                    f"📈 **Lucro Atual:** {pnl_pct*100:.2f}%"
                 )
                 await self.send_notification(msg)
                 logging.info(f"[{symbol}] Trailing Stop movido para {trailing_stop_price:.2f}")
@@ -384,14 +384,15 @@ class MrRobotTrade:
             logging.info(f"Trade CLOSED. PnL: {pnl:.2f} USDT")
 
             # Notify
-            icon = "💰" if pnl >= 0 else "🔻"
+            res_icon = "💰" if pnl >= 0 else "🔻"
+            res_text = "LUCRO" if pnl >= 0 else "PREJUÍZO"
+
             msg = (
-                f"{icon} **Trade CLOSED**\n"
-                f"Symbol: `{symbol}`\n"
-                f"Side: `{side}`\n"
-                f"Close: `{exit_price}`\n"
-                f"PnL: `{pnl:.2f} USDT` ({((exit_price - entry_price) / entry_price * 100):.2f}%)\n"
-                f"Reason: `{reason}`"
+                f"{res_icon} **OPERAÇÃO FINALIZADA**\n\n"
+                f"🔹 **Ativo:** {symbol}\n"
+                f"🏁 **Saída:** ${exit_price:,.2f}\n"
+                f"💵 **PnL:** ${pnl:,.2f} USDT ({((exit_price - entry_price) / entry_price * 100):.2f}%)\n"
+                f"📝 **Motivo:** {reason}"
             )
             await self.send_notification(msg)
 
