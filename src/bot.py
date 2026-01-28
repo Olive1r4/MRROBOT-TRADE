@@ -277,8 +277,10 @@ class MrRobotTrade:
         pnl_pct = (current_price - entry_price) / entry_price
 
         # Heartbeat Log while managing
+        leverage = int(self.current_trade.get('market_settings', {}).get('leverage', 5))
+        roi_pct = pnl_pct * leverage
         ts_status = f"{float(self.current_trade.get('strategy_data', {}).get('trailing_stop_price', 0)):.2f}" if self.current_trade.get('strategy_data', {}).get('trailing_stop_price') else "OFF"
-        logging.info(f"[{symbol}] MANAGING | Price: {current_price:.2f} | PnL: {pnl_pct*100:.2f}% | TS: {ts_status}")
+        logging.info(f"[{symbol}] MANAGING | Price: {current_price:.2f} | PnL: {pnl_pct*100:.2f}% | ROI: {roi_pct*100:.2f}% | TS: {ts_status}")
 
         # 1. Recuperar Dados
         initial_stop_percent = 0.05
