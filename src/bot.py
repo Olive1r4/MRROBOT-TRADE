@@ -6,6 +6,7 @@ from src.database import Database
 from src.strategy import Strategy
 from src.risk_manager import RiskManager
 from src.logger_handler import SupabaseHandler
+from datetime import datetime
 from telegram import Bot
 from telegram.error import TelegramError
 
@@ -344,36 +345,53 @@ class MrRobotTrade:
         side = 'SELL' if self.current_trade['side'] == 'LONG' else 'BUY'
         symbol = self.current_trade['symbol']
 
-        order = await self.exchange.create_order(symbol, side, amount, params={'reduceOnly': True})
+        try:
+            order = await self.exchange.create_order(symbol, side, amount, params={'reduceOnly': True})
 
-        if order:
-            # 2. Calculate Realized PnL
-            # (Exit - Entry) * Amount
+            # 2. If order failed, check if position already closed
+            if not order and Config.TRADING_MODE == 'LIVE':
+                logging.warning(f"Close order failed for {symbol}. Checking if position already closed on Binance...")
+                pos_size = await self.exchange.get_position(symbol)
+                if pos_size == 0:
+                    logging.info(f"Position for {symbol} is already 0 on Binance. Synchronizing local state to CLOSED.")
+                    # Create a dummy order object to proceed with closing
+                    order = {
+                        'average': current_price,
+                        'amount': amount,
+                        'status': 'closed',
+                        'info': {'msg': 'Auto-sync: Position was already closed'}
+                    }
+                else:
+                    logging.error(f"Position {pos_size} still exists for {symbol}. Will retry next cycle.")
+                    return
+
+            # fallback exit price
+            exit_price = current_price
+            if order and order.get('average'):
+                exit_price = float(order['average'])
+            elif order and order.get('price'):
+                exit_price = float(order['price'])
+
+            # 3. Calculate Realized PnL
             entry_price = float(self.current_trade['entry_price'])
-            exit_price = float(order['average'])
+            pnl = (exit_price - entry_price) * amount if self.current_trade['side'] == 'LONG' else (entry_price - exit_price) * amount
 
-            # Raw PnL
-            pnl = (exit_price - entry_price) * amount
-            # Leveraged PnL is technically tracking the Margin change,
-            # but PnL calculation above is effectively the profit in USDT.
-
-            # 3. Update DB
+            # 4. Update DB
             update_data = {
                 'status': 'CLOSED',
                 'close_price': exit_price,
                 'close_time': datetime.now().isoformat(),
                 'exit_reason': reason,
                 'pnl': pnl,
-                'pnl_percentage': (exit_price - entry_price) / entry_price * 100
+                'pnl_percentage': (pnl / (entry_price * amount)) * 100 if entry_price != 0 else 0
             }
 
             self.db.update_trade(self.current_trade['id'], update_data)
 
-            # 4. Update/Log Balance
+            # 5. Update/Log Balance
             if Config.TRADING_MODE == 'PAPER':
                 await self.exchange.update_paper_balance(pnl)
             else:
-                # Log current LIVE balance to DB history
                 new_bal = await self.exchange.get_balance()
                 self.db.log_wallet({
                     'total_balance': float(new_bal['total']),
@@ -397,6 +415,8 @@ class MrRobotTrade:
             await self.send_notification(msg)
 
             self.current_trade = None
+        except Exception as e:
+            logging.error(f"Error in close_trade process: {e}")
 
 if __name__ == "__main__":
     bot = MrRobotTrade()

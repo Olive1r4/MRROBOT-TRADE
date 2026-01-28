@@ -80,6 +80,19 @@ class Exchange:
             # Paper Mode
             return {'free': self.paper_balance, 'total': self.paper_balance}
 
+    async def get_position(self, symbol):
+        """Check active position for a symbol. Returns size (float)."""
+        if self.mode == 'LIVE':
+            try:
+                positions = await self.client.fetch_positions(symbols=[symbol])
+                if positions:
+                    return float(positions[0]['contracts'])
+                return 0.0
+            except Exception as e:
+                logging.error(f"Error fetching position for {symbol}: {e}")
+                return 0.0
+        return 0.0 # Paper mode doesn't track this yet
+
     async def set_leverage(self, leverage, symbol):
         """Set leverage for symbol."""
         try:
