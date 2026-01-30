@@ -27,9 +27,11 @@ class Strategy:
         if bb is not None:
             df = pd.concat([df, bb], axis=1)
             # Normalize names (Pandas TA uses BBL_20_2.0, BBM_20_2.0, BBU_20_2.0)
-            df['bb_lower'] = df[f'BBL_{self.bb_length}_{self.bb_std}']
-            df['bb_middle'] = df[f'BBM_{self.bb_length}_{self.bb_std}']
-            df['bb_upper'] = df[f'BBU_{self.bb_length}_{self.bb_std}']
+            # Safer approach: access by position (Lower, Mid, Upper are usually first 3)
+            # pandas_ta bbands returns: BBL, BBM, BBU, BBB, BBP
+            df['bb_lower'] = bb.iloc[:, 0]
+            df['bb_middle'] = bb.iloc[:, 1]
+            df['bb_upper'] = bb.iloc[:, 2]
 
         # RSI
         df['rsi'] = ta.rsi(df['close'], length=self.rsi_length)
