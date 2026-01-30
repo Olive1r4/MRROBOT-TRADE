@@ -149,15 +149,13 @@ class MrRobotTrade:
                         # Heartbeat Log - Show monitoring activity
                         if not entered:
                             last_row = df.iloc[-1]
-                            ema9 = last_row.get('ema_fast', 0)
-                            ema21 = last_row.get('ema_slow', 0)
-                            supertrend = last_row.get('supertrend', 0)
-                            st_direction = "UP" if current_price > supertrend else "DOWN"
+                            rsi = last_row.get('rsi', 0)
+                            bb_lower = last_row.get('bb_lower', 0)
+                            bb_middle = last_row.get('bb_middle', 0)
 
                             logging.info(
                                 f"[{symbol}] Price: {current_price:.2f} | "
-                                f"EMA9: {ema9:.2f} / EMA21: {ema21:.2f} | "
-                                f"SuperTrend: {st_direction} | Status: Monitoring"
+                                f"RSI: {rsi:.2f} | BB Low: {bb_lower:.2f} | BB Mid: {bb_middle:.2f} | Status: Monitoring"
                             )
 
                         if entered:
