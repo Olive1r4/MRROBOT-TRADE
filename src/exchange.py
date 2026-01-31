@@ -46,7 +46,7 @@ class Exchange:
     async def close(self):
         await self.client.close()
 
-    async def get_candles(self, symbol, limit=100):
+    async def get_candles(self, symbol, limit=300):
         """ALWAYS fetch real market data."""
         try:
             ohlcv = await self.client.fetch_ohlcv(symbol, self.timeframe, limit=limit)
