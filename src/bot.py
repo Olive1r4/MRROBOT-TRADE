@@ -126,7 +126,7 @@ class MrRobotTrade:
                     active_markets = self.db.get_active_markets()
                     if not active_markets:
                         logging.warning("No active markets found in DB.")
-                        await asyncio.sleep(10)
+                        await asyncio.sleep(15)
                         continue
 
                     for market in active_markets:
@@ -149,13 +149,14 @@ class MrRobotTrade:
                         # Heartbeat Log - Show monitoring activity
                         if not entered:
                             last_row = df.iloc[-1]
-                            rsi = last_row.get('rsi', 0)
-                            bb_lower = last_row.get('bb_lower', 0)
-                            bb_middle = last_row.get('bb_middle', 0)
+                            ema50 = last_row.get('ema_50', 0)
+                            ema200 = last_row.get('ema_200', 0)
+                            adx = last_row.get('adx', 0)
+                            trend = "BULL" if ema50 > ema200 else "BEAR"
 
                             logging.info(
                                 f"[{symbol}] Price: {current_price:.2f} | "
-                                f"RSI: {rsi:.2f} | BB Low: {bb_lower:.2f} | BB Mid: {bb_middle:.2f} | Status: Monitoring"
+                                f"Trend: {trend} (50/200) | ADX: {adx:.1f} | Status: Monitoring"
                             )
 
                         if entered:
@@ -166,13 +167,13 @@ class MrRobotTrade:
                         await asyncio.sleep(1)
 
                 # Wait before next cycle
-                await asyncio.sleep(10)
+                await asyncio.sleep(15)
 
             except Exception as e:
                 logging.error(f"Main Loop Error: {e}")
                 import traceback
                 traceback.print_exc()
-                await asyncio.sleep(10)
+                await asyncio.sleep(15)
 
     async def look_for_entry(self, df, current_price, market_settings):
         signal, data = self.strategy.check_signal(df)
@@ -228,7 +229,7 @@ class MrRobotTrade:
                     'amount': float(order.get('amount', amount)),
                     'status': 'OPEN',
                     'mode': Config.TRADING_MODE,
-                    'entry_reason': 'BB Dip + RSI Oversold',
+                    'entry_reason': data.get('signal_reason', 'Trend Following'),
                     'strategy_data': data
                 }
 
@@ -258,7 +259,7 @@ class MrRobotTrade:
                     f"💰 **ENTRADA:** `${float(order.get('average', current_price)):,.2f}`\n"
                     f"📊 **VALOR:** `${notional:,.2f} USDT`\n"
                     f"⚙️ **ALAVANCAGEM:** `{leverage}x`\n\n"
-                    f"🎯 *Monitorando Trailing Stop: 0.1% (Gatilho 0.4%)*"
+                    f"🎯 *Stop ATR:* {data.get('atr', 0):.2f} | *Alvo:* 1.5x"
                 )
                 if not res:
                     msg += "\n\n⚠️ **DATABASE ERROR:** Posição aberta mas não registrada no DB!"
@@ -293,36 +294,58 @@ class MrRobotTrade:
         should_exit = False
         exit_reason = ""
 
-        # 2. Verificar Saída de Emergência (Stop Loss Inicial)
+        # 2. Verificar Saída de Emergência (Stop Loss Dinâmico ATR)
         if trailing_stop_price is None:
-            if pnl_pct <= -initial_stop_percent:
+            # Calcular Stop ATR na primeira execução se não existir
+            if 'stop_loss_price' not in strategy_data:
+                atr = float(strategy_data.get('atr', 0))
+                # Stop = Entry - 2*ATR (for LONG)
+                initial_stop = entry_price - (2.0 * atr)
+                strategy_data['stop_loss_price'] = initial_stop
+                # Calcular Take Profit (1.5x Risco)
+                risk = entry_price - initial_stop
+                if risk > 0:
+                    strategy_data['take_profit_price'] = entry_price + (1.5 * risk)
+
+                self.current_trade['strategy_data'] = strategy_data
+                self.db.update_trade(self.current_trade['id'], {'strategy_data': strategy_data})
+                logging.info(f"[{symbol}] Initial Risk Setup | ATR Stop: {initial_stop:.2f} | TP: {strategy_data.get('take_profit_price'):.2f}")
+
+            stop_loss = strategy_data.get('stop_loss_price')
+            if stop_loss and current_price <= stop_loss:
                 should_exit = True
-                exit_reason = f"Initial Stop Loss (-{initial_stop_percent*100}%)"
+                exit_reason = f"ATR Stop Loss ({stop_loss:.2f})"
 
-        # 3. Atualizar/Verificar Trailing Stop (Lucro)
-        # Ativação Scalper: Se lucrou >= 0.4%
-        if pnl_pct >= 0.004:
-            new_stop = current_price * (1 - 0.001) # Distância de 0.1%
+        # 3. Take Profit Fixo (1.5x)
+        take_profit = strategy_data.get('take_profit_price')
+        if take_profit and current_price >= take_profit:
+             should_exit = True
+             exit_reason = f"Take Profit Target (1.5x) ({take_profit:.2f})"
 
-            # Lógica da Catraca: Só move se for para subir o stop
-            if trailing_stop_price is None or new_stop > trailing_stop_price:
+        # 4. Trailing Stop (Breakeven)
+        # Se lucrou 1x o risco, move pro zero a zero
+        if trailing_stop_price is None and 'stop_loss_price' in strategy_data:
+            stop_price = float(strategy_data['stop_loss_price'])
+            risk_amount = entry_price - stop_price
+
+            # Se preço andou 1x o risco a favor
+            if current_price >= (entry_price + risk_amount):
+                new_stop = entry_price * 1.001 # Breakeven + taxas
                 trailing_stop_price = new_stop
                 strategy_data['trailing_stop_price'] = trailing_stop_price
                 self.current_trade['strategy_data'] = strategy_data
-
-                # Persistência no DB
                 self.db.update_trade(self.current_trade['id'], {'strategy_data': strategy_data})
 
                 msg = (
-                    f"⚙️ **TRAILING STOP ESCALADOR**\n\n"
+                    f"🛡️ **STOP MOVIDO PARA BREAKEVEN**\n\n"
                     f"🔹 **Ativo:** {symbol}\n"
-                    f"🛡️ **Novo Stop:** ${trailing_stop_price:,.2f}\n"
+                    f"🔒 **Novo Stop:** ${new_stop:,.2f} (Entrada)\n"
                     f"📈 **Lucro Atual:** {pnl_pct*100:.2f}%"
                 )
                 await self.send_notification(msg)
-                logging.info(f"[{symbol}] Trailing Stop Scalper movido para {trailing_stop_price:.2f}")
+                logging.info(f"[{symbol}] Moved to Breakeven: {new_stop:.2f}")
 
-        # Execução do Trailing Stop
+        # Execução do Trailing Stop (se já estiver ativo)
         if trailing_stop_price is not None and current_price < trailing_stop_price:
             should_exit = True
             exit_reason = f"Trailing Stop Hit ({trailing_stop_price:.2f})"

@@ -3,10 +3,12 @@ import pandas_ta as ta
 
 class Strategy:
     def __init__(self):
-        # Mean Reversion Scalping Setup
-        self.bb_length = 20
-        self.bb_std = 2.0
-        self.rsi_length = 14
+        # Trend Following Setup
+        self.ema_short_len = 50
+        self.ema_long_len = 200
+        self.adx_len = 14
+        self.adx_threshold = 20
+        self.atr_len = 14
 
     def parse_data(self, ohlcv):
         """Convert CCXT ohlcv to Pandas DataFrame."""
@@ -18,66 +20,88 @@ class Strategy:
         return df
 
     def calculate_indicators(self, df):
-        """Calculate Bollinger Bands and RSI."""
-        if df.empty or len(df) < self.bb_length:
+        """Calculate EMAs, ADX and ATR."""
+        if df.empty or len(df) < self.ema_long_len:
             return df
 
-        # Bollinger Bands
-        bb = ta.bbands(df['close'], length=self.bb_length, std=self.bb_std)
-        if bb is not None:
-            df = pd.concat([df, bb], axis=1)
-            # Normalize names (Pandas TA uses BBL_20_2.0, BBM_20_2.0, BBU_20_2.0)
-            # Safer approach: access by position (Lower, Mid, Upper are usually first 3)
-            # pandas_ta bbands returns: BBL, BBM, BBU, BBB, BBP
-            df['bb_lower'] = bb.iloc[:, 0]
-            df['bb_middle'] = bb.iloc[:, 1]
-            df['bb_upper'] = bb.iloc[:, 2]
+        # EMAs
+        df['ema_50'] = ta.ema(df['close'], length=self.ema_short_len)
+        df['ema_200'] = ta.ema(df['close'], length=self.ema_long_len)
 
-        # RSI
-        df['rsi'] = ta.rsi(df['close'], length=self.rsi_length)
+        # ADX (Returns DataFrame: ADX_14, DMP_14, DMN_14)
+        adx = ta.adx(df['high'], df['low'], df['close'], length=self.adx_len)
+        if adx is not None:
+            df = pd.concat([df, adx], axis=1)
+            # Normalize column name
+            df['adx'] = df[f'ADX_{self.adx_len}']
+
+        # ATR (For volatility-based stops)
+        df['atr'] = ta.atr(df['high'], df['low'], df['close'], length=self.atr_len)
 
         return df
 
     def check_signal(self, df):
         """
-        Check for ENTRY signals (LONG) based on Mean Reversion.
-        Entry: Close < Lower Band (Dip) AND RSI < 30 (Oversold)
+        Check for ENTRY signals (LONG) based on Trend Following.
         """
-        if df.empty or len(df) < self.bb_length:
+        if df.empty or len(df) < self.ema_long_len:
             return None, None
 
-        # Signals are checked on the last closed candle
-        curr = df.iloc[-2]
+        curr = df.iloc[-2] # Last closed candle
+        prev = df.iloc[-3]
 
-        # Conditions
-        dip = curr['close'] < curr['bb_lower']
-        oversold = curr['rsi'] < 30
+        # 1. Trend Direction (EMA 50 > EMA 200)
+        trend_up = curr['ema_50'] > curr['ema_200']
 
-        if dip and oversold:
+        # 2. Strong Trend Strength (ADX > 20)
+        strong_trend = curr['adx'] > self.adx_threshold
+
+        # 3. Entry Trigger:
+        # Option A: Golden Cross (EMA 50 crosses above 200) - Very safe, rare signals
+        # Option B: Price Pullback (Price closes above EMA 50 while Trend is UP) - More frequent
+        # Let's go with Golden Cross OR Trend Continuation (Price crosses EMA 50 up)
+
+        # Golden Cross
+        golden_cross = (curr['ema_50'] > curr['ema_200']) and (prev['ema_50'] <= prev['ema_200'])
+
+        # Price Cross over EMA 50 (Re-entry in trend)
+        price_cross_ema50 = (curr['close'] > curr['ema_50']) and (prev['close'] <= prev['ema_50'])
+
+        signal = False
+        reason = ""
+
+        if strong_trend:
+            if golden_cross:
+                signal = True
+                reason = "Golden Cross (50/200)"
+            elif trend_up and price_cross_ema50:
+                signal = True
+                reason = "Trend Continuation (EMA 50 Breakout)"
+
+        if signal:
             return "LONG", {
-                "bb_lower": float(curr['bb_lower']),
-                "bb_middle": float(curr['bb_middle']),
-                "rsi": float(curr['rsi']),
-                "price": float(curr['close'])
+                "ema_50": float(curr['ema_50']),
+                "ema_200": float(curr['ema_200']),
+                "adx": float(curr['adx']),
+                "atr": float(curr['atr']),
+                "price": float(curr['close']),
+                "signal_reason": reason
             }
 
         return None, None
 
     def check_exit(self, df, position_side):
         """
-        Check for EXIT signals based on Mean Reversion.
-        Exit: Price >= Middle Band (Return to mean) OR RSI > 70
+        Check for EXIT signals based on Trend Reversal.
         """
-        if df.empty or len(df) < 1:
+        if df.empty:
             return False, "No Data"
 
-        # For exits, we can use the current price (last candle in DF)
-        curr = df.iloc[-1]
+        curr = df.iloc[-1] # Current candle
 
+        # Exit if Trend breaks (Price closes below EMA 200) - "The Trend is dead"
         if position_side == "LONG":
-            exit_condition = (curr['close'] >= curr['bb_middle']) or (curr['rsi'] > 70)
-            if exit_condition:
-                reason = "Mean Reversion (BB Middle)" if curr['close'] >= curr['bb_middle'] else "RSI Overbought (>70)"
-                return True, reason
+            if curr['close'] < curr['ema_200']:
+                return True, "Trend Reversal (Close < EMA 200)"
 
         return False, None
