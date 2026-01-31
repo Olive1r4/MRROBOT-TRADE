@@ -299,6 +299,11 @@ class MrRobotTrade:
             # Calcular Stop ATR na primeira execução se não existir
             if 'stop_loss_price' not in strategy_data:
                 atr = float(strategy_data.get('atr', 0))
+                # Fallbacks for old trades
+                if atr == 0 and not df.empty:
+                    atr = df.iloc[-1].get('atr', 0)
+                if atr == 0:
+                     atr = entry_price * 0.01
                 # Stop = Entry - 2*ATR (for LONG)
                 initial_stop = entry_price - (2.0 * atr)
                 strategy_data['stop_loss_price'] = initial_stop
@@ -309,7 +314,9 @@ class MrRobotTrade:
 
                 self.current_trade['strategy_data'] = strategy_data
                 self.db.update_trade(self.current_trade['id'], {'strategy_data': strategy_data})
-                logging.info(f"[{symbol}] Initial Risk Setup | ATR Stop: {initial_stop:.2f} | TP: {strategy_data.get('take_profit_price'):.2f}")
+                tp_val = strategy_data.get('take_profit_price')
+                tp_str = f"{tp_val:.2f}" if tp_val else "N/A"
+                logging.info(f"[{symbol}] Initial Risk Setup | ATR Stop: {initial_stop:.2f} | TP: {tp_str}")
 
             stop_loss = strategy_data.get('stop_loss_price')
             if stop_loss and current_price <= stop_loss:
