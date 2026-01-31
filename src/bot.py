@@ -324,12 +324,20 @@ class MrRobotTrade:
                 side_icon = "🟢" if signal.upper() in ['LONG', 'BUY'] else "🔴"
                 notional = float(order.get('amount', amount)) * float(order.get('average', current_price))
 
+                # Determine Risk Status Label for Notification
+                adx_val = data.get('adx', 0)
+                risk_label = "Normal (100%)"
+                if adx_val >= 50: risk_label = "Mínimo (40%) ⚠️"
+                elif adx_val >= 40: risk_label = "Reduzido (60%) ⚠️"
+                elif adx_val >= 30: risk_label = "Moderado (80%)"
+
                 msg = (
                     f"🚀 **NOVA OPERAÇÃO ABERTA**\n\n"
                     f"{side_icon} **ATIVO:** `{symbol}`\n"
                     f"⚡ **LADO:** `{signal}`\n"
                     f"💰 **ENTRADA:** `${float(order.get('average', current_price)):,.2f}`\n"
                     f"📊 **VALOR:** `${notional:,.2f} USDT`\n"
+                    f"🛡️ **RISCO:** `{risk_label}` (ADX {adx_val:.1f})\n"
                     f"⚙️ **ALAVANCAGEM:** `{leverage}x`\n\n"
                     f"🎯 *Stop ATR:* {data.get('atr', 0):.2f} | *Alvo:* 1.5x"
                 )
