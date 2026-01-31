@@ -221,13 +221,67 @@ class MrRobotTrade:
             if Config.TRADING_MODE == 'LIVE':
                  await self.exchange.set_leverage(leverage, symbol)
 
-            # Exposure Management:
-            # Each trade gets (MAX_EXPOSURE / MAX_TRADES) share of balance
-            target_per_trade_pct = self.MAX_EXPOSURE_PCT / self.MAX_OPEN_TRADES
-            position_size_usdt = available_balance * target_per_trade_pct
+            # --- ADVANCED DYNAMIC RISK SIZING ---
 
-            # Convert USDT size to Token Amount
-            amount = (position_size_usdt * leverage) / current_price
+            # 1. Base Risk (1% of Equity)
+            RISK_PER_TRADE = 0.01
+            equity = available_balance # Using free balance as proxy for equity
+
+            # 2. ADX Factor
+            current_adx = data.get('adx', 0)
+            adx_factor = 0.0
+            if current_adx < 20: adx_factor = 0.0 # Should be filtered before, but safety net
+            elif current_adx < 30: adx_factor = 1.0
+            elif current_adx < 40: adx_factor = 0.8
+            elif current_adx < 50: adx_factor = 0.6
+            else: adx_factor = 0.4
+
+            # 3. Exposure Factor (1 / (N+1))
+            # Count open trades on the same side
+            same_side_count = sum(1 for t in self.active_trades if t['side'] == signal)
+            exposure_factor = 1.0 / (same_side_count + 1)
+
+            # 4. Adjusted Risk Calculation
+            adjusted_risk_amt = equity * RISK_PER_TRADE * adx_factor * exposure_factor
+
+            # 5. Global Risk Cap Check (Max 2% total risk per side)
+            MAX_GLOBAL_RISK_SIDE = 0.02
+            current_side_risk = 0.0
+            for t in self.active_trades:
+                if t['side'] == signal:
+                    # Estimate current risk amount of open trade
+                    # We stored 'initial_risk_amt' hopefully, or approximated:
+                    # If not stored, we can approximate 1% * equity (conservative)
+                    current_side_risk += (equity * RISK_PER_TRADE) # Simplification if not stored
+
+            if (current_side_risk/equity) + (adjusted_risk_amt/equity) > MAX_GLOBAL_RISK_SIDE:
+                 logging.warning(f"Entry blocked: Global Risk Cap ({MAX_GLOBAL_RISK_SIDE*100}%) would be exceeded.")
+                 return False
+
+            # 6. Calculate Position Size based on Stop Distance
+            # Retrieve ATR for stop distance
+            atr = data.get('atr', 0)
+            if atr == 0: atr = current_price * 0.01 # Fallback
+
+            stop_distance = 2.0 * atr # 2 ATR stop
+
+            if stop_distance == 0:
+                 logging.warning("Stop distance is 0, cannot calculate size.")
+                 return False
+
+            # Size (Tokens) = Risk Amount / Stop Distance per Token
+            # Example: Risk $20 / Stop $100 (per BTC) = 0.2 BTC
+            amount = adjusted_risk_amt / stop_distance
+
+            # Notional Value Check (Balance Limit)
+            notional_value = amount * current_price
+            max_leverage_amount = (equity * leverage) * 0.95 # 95% of max buying power
+
+            if notional_value > max_leverage_amount:
+                amount = max_leverage_amount / current_price
+                logging.warning(f"Position size capped by wallet balance to {amount:.4f}")
+
+            logging.info(f"Risk Logic: ADX={current_adx:.1f} (F={adx_factor}) | Exp={exposure_factor:.2f} | Risk=${adjusted_risk_amt:.2f} | Size={amount:.4f}")
 
             # 1.4 Final Validation
             is_valid, error_msg = self.risk_manager.validate_entry(symbol, leverage, amount, available_balance, current_price)
