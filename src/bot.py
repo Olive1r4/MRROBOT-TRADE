@@ -280,6 +280,38 @@ class MrRobotTrade:
                 amount = max_leverage_amount / current_price
                 logging.warning(f"Position size capped by wallet balance to {amount:.4f}")
 
+            # 7. Minimum Size Check (Upsize for Small Accounts)
+            # Ensure we meet the 10 USDT minimum (using 11 USDT for safety)
+            notional_value = amount * current_price
+            MIN_NOTIONAL = 11.0
+
+            if notional_value < MIN_NOTIONAL:
+                logging.info(f"Calculated size {notional_value:.2f} USDT < {MIN_NOTIONAL}. Attempting to upsize to minimum.")
+
+                # Calculate needed amount
+                proposed_amount = MIN_NOTIONAL / current_price
+
+                # Check Risk Impact
+                # New Risk = Proposed Amount * Stop Distance
+                new_risk_amt = proposed_amount * stop_distance
+                new_risk_pct = new_risk_amt / equity
+
+                # Allow upsizing if Risk is < 10% of equity (relaxed for small accounts)
+                MAX_UPSIZE_RISK = 0.10
+
+                # Also check if we have enough balance/margin
+                # Required Margin = Notional / Leverage
+                required_margin = MIN_NOTIONAL / leverage
+
+                if required_margin > available_balance:
+                     logging.warning(f"Upsizing blocked: Insufficient balance ({available_balance:.2f} < {required_margin:.2f})")
+                elif new_risk_pct > MAX_UPSIZE_RISK:
+                     logging.warning(f"Upsizing blocked: Risk too high ({new_risk_pct*100:.1f}% > {MAX_UPSIZE_RISK*100:.1f}%)")
+                else:
+                     amount = proposed_amount
+                     adjusted_risk_amt = new_risk_amt # Update for logging
+                     logging.info(f"Upsized to {MIN_NOTIONAL} USDT (New Risk: {new_risk_pct*100:.1f}%)")
+
             logging.info(f"Risk Logic: ADX={current_adx:.1f} (F={adx_factor}) | Exp={exposure_factor:.2f} | Risk=${adjusted_risk_amt:.2f} | Size={amount:.4f}")
 
             # 1.4 Final Validation
