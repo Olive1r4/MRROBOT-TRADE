@@ -340,15 +340,16 @@ class MrRobotTrade:
 
                 res = self.db.log_trade(trade_record)
                 if res and res.data:
-                    self.active_trades.append(new_trade_obj)
-                    # Inject market settings into current_trade dict for management usage (e.g. Stop Loss)
-                    self.current_trade['market_settings'] = market_settings
-                    logging.info(f"Trade recorded in DB: {self.current_trade['id']}")
+                    # Success: Use the record returned by DB (contains ID)
+                    stored_trade = res.data[0]
+                    stored_trade['market_settings'] = market_settings
+                    self.active_trades.append(stored_trade)
+                    logging.info(f"Trade recorded in DB: {stored_trade['id']}")
                 else:
                     logging.critical(f"🚨 FAILED TO LOG TRADE IN DB! But order is OPEN on Binance. Local state updated.")
                     new_trade_obj = trade_record
                     new_trade_obj['id'] = 'LOCAL_TEMP_ID'
-                    new_trade_obj['market_settings'] = market_settings
+                    new_trade_obj['market_settings'] = market_settings # Ensure consistency
                     self.active_trades.append(new_trade_obj)
 
                 # Notify
