@@ -60,7 +60,6 @@ class MrRobotTrade:
                 .select('*')\
                 .eq('status', 'OPEN')\
                 .eq('mode', Config.TRADING_MODE)\
-                .limit(1)\
                 .execute()
 
             if response.data and len(response.data) > 0:
