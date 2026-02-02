@@ -22,7 +22,7 @@ class Database:
     def log_trade(self, trade_data: dict):
         try:
             db = self.get_client()
-            response = db.table('trades').insert(trade_data).execute()
+            response = db.table('trades_mrrobot').insert(trade_data).execute()
             return response
         except Exception as e:
             logging.error(f"Error logging trade: {e}")
@@ -31,7 +31,7 @@ class Database:
     def update_trade(self, trade_id: str, update_data: dict):
         try:
             db = self.get_client()
-            response = db.table('trades').update(update_data).eq('id', trade_id).execute()
+            response = db.table('trades_mrrobot').update(update_data).eq('id', trade_id).execute()
             return response
         except Exception as e:
             logging.error(f"Error updating trade: {e}")
@@ -41,7 +41,7 @@ class Database:
         try:
             db = self.get_client()
             # Only keep history, don't update existing rows usually for history
-            response = db.table('wallet_history').insert(wallet_data).execute()
+            response = db.table('wallet_logs_mrrobot').insert(wallet_data).execute()
             return response
         except Exception as e:
             logging.error(f"Error logging wallet history: {e}")
@@ -51,7 +51,7 @@ class Database:
         try:
             db = self.get_client()
             # Get the most recent wallet history entry for PAPER mode
-            response = db.table('wallet_history')\
+            response = db.table('wallet_logs_mrrobot')\
                 .select('total_balance')\
                 .eq('mode', 'PAPER')\
                 .order('timestamp', desc=True)\
@@ -82,7 +82,7 @@ class Database:
         """Log system errors to the database."""
         try:
             db = self.get_client()
-            db.table('system_logs').insert(log_data).execute()
+            db.table('logs_mrrobot').insert(log_data).execute()
         except:
             # We don't use logging.error here to avoid infinite loops if DB is down
             pass
