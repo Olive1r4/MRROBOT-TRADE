@@ -192,8 +192,8 @@ class GridTradingBot:
                                 'symbol': symbol,
                                 'side': 'LONG',  # Grid always starts with BUY
                                 'entry_price': level['price'],
-                                'amount': level['size'],
-                                'status': 'pending',
+                                'amount': order['amount'],  # Use actual amount from exchange (handles truncation)
+                                'status': 'PENDING',
                                 'strategy_data': {
                                     'strategy': 'grid_trading',
                                     'grid_level': level['level'],
@@ -307,7 +307,7 @@ class GridTradingBot:
                         'side': 'LONG',
                         'entry_price': filled_order['price'],
                         'amount': filled_order['amount'],
-                        'status': 'open',
+                        'status': 'OPEN',
                         'strategy_data': {
                             'strategy': 'grid_trading',
                             'grid_level': order_data['level'],
