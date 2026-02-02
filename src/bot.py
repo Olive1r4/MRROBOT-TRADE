@@ -441,6 +441,10 @@ class MrRobotTrade:
                     tp_min = entry_price * (1 - min_gain_pct)
                     take_profit = min(tp_atr, tp_min)
 
+                # Log detailed target selection
+                target_type = "MIN_GAIN" if (side == 'LONG' and take_profit == tp_min) or (side == 'SHORT' and take_profit == tp_min) else "ATR_TARGET"
+                logging.info(f"[{symbol}] Target Selection: {target_type} | ATR_TP={tp_atr:.4f} vs MIN_TP={tp_min:.4f}")
+
                 strategy_data['stop_loss_price'] = initial_stop
                 strategy_data['take_profit_price'] = take_profit
 
