@@ -420,19 +420,34 @@ class MrRobotTrade:
                     atr = df.iloc[-1].get('atr', 0)
                 if atr == 0:
                      atr = entry_price * 0.01
-                # Stop = Entry - 2*ATR (for LONG)
-                initial_stop = entry_price - (2.0 * atr)
+                # --- CORRECTED RISK LOGIC ---
+                multiplier_stop = 2.0
+                multiplier_tp = 3.0    # Risk/Reward 1:1.5
+                min_gain_pct = 0.015   # Minimum Target 1.5%
+
+                if side == 'LONG':
+                    initial_stop = entry_price - (multiplier_stop * atr)
+
+                    # Target: Max of (ATR Target, Min % Target)
+                    tp_atr = entry_price + (multiplier_tp * atr)
+                    tp_min = entry_price * (1 + min_gain_pct)
+                    take_profit = max(tp_atr, tp_min)
+
+                else: # SHORT
+                    initial_stop = entry_price + (multiplier_stop * atr)
+
+                    # Target: Min of (ATR Target, Min % Target)
+                    tp_atr = entry_price - (multiplier_tp * atr)
+                    tp_min = entry_price * (1 - min_gain_pct)
+                    take_profit = min(tp_atr, tp_min)
+
                 strategy_data['stop_loss_price'] = initial_stop
-                # Calcular Take Profit (1.5x Risco)
-                risk = entry_price - initial_stop
-                if risk > 0:
-                    strategy_data['take_profit_price'] = entry_price + (1.5 * risk)
+                strategy_data['take_profit_price'] = take_profit
 
                 trade['strategy_data'] = strategy_data
                 self.db.update_trade(trade['id'], {'strategy_data': strategy_data})
-                tp_val = strategy_data.get('take_profit_price')
-                tp_str = f"{tp_val:.2f}" if tp_val else "N/A"
-                logging.info(f"[{symbol}] Initial Risk Setup | ATR Stop: {initial_stop:.2f} | TP: {tp_str}")
+
+                logging.info(f"[{symbol}] Risk Setup ({side}) | Entry: {entry_price} | Stop: {initial_stop:.4f} | TP: {take_profit:.4f}")
 
             stop_loss = strategy_data.get('stop_loss_price')
             if stop_loss:
