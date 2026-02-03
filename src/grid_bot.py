@@ -337,7 +337,7 @@ class GridTradingBot:
                 }
 
                 # Save BUY execution and SELL order creation to DB
-                # Save BUY execution and SELL order creation to DB
+                pnl = 0.0
                 try:
                     # Calculate profit based on direction
                     # If we bought (LONG), profit is Sell - Buy
@@ -377,8 +377,7 @@ class GridTradingBot:
 
                 except Exception as e:
                     logging.error(f"Failed to log trade update to DB: {e}")
-                except Exception as e:
-                    logging.error(f"Failed to log trade update to DB: {e}")
+
 
                 logging.info(f"[GRID] Created opposite order: {opposite['side']} @ ${opposite['price']:.4f}")
 
@@ -387,7 +386,7 @@ class GridTradingBot:
                     f"🔹 Symbol: {symbol}\n"
                     f"📍 Filled: {filled_order['side'].upper()} @ ${filled_order['price']:.4f}\n"
                     f"🎯 Created: {opposite['side']} @ ${opposite['price']:.4f}\n"
-                    f"💰 Expected Profit: ${profit:.2f}"
+                    f"💰 Expected Profit: ${pnl:.2f}"
                 )
                 await self.send_notification(msg)
 
