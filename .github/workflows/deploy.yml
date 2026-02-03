@@ -22,7 +22,10 @@ jobs:
 
             # Stop and remove ONLY the bot container to prevent name conflicts
             docker stop mrrobot_trade_bot || true
-            docker rm mrrobot_trade_bot || true
+            docker rm -f mrrobot_trade_bot || true
+
+            # Wait for Docker to cleanup the name
+            sleep 10
 
             # Start up - Build cache is preserved because we didn't run system prune
             docker compose up -d --build --remove-orphans
