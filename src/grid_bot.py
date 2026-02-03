@@ -344,36 +344,69 @@ class GridTradingBot:
                     # If we sold (SHORT), profit is Sell - Buy (which is Entry - Exit for short? No, PnL is usually Entry-Exit for Short)
                     # For Spot/Long-Only Grid:
                     if filled_order['side'].upper() == 'BUY':
+                        # COMPRA preenchida -> Ciclo iniciou/continuou -> Status OPEN
+                        # Atualizamos o registro existente (que estava PENDING)
                         pnl = (opposite['price'] - filled_order['price']) * filled_order['amount']
-                    else:
-                        # If we filled a SELL, we are placing a BUY back lower.
-                        # The realized profit from the SELL action (vs original buy) is already done.
-                        # But here we are calculating "Expected Profit" of the NEXT leg?
-                        # No, usually we log the realized profit of the cycle just completed?
-                        # Wait, handle_filled_order handles the OPENING of the second leg.
-                        # So we are logging the EXPECTED profit of this new Limit Order.
-                        # If Limit is Sell (TP), Expected PnL = (Sell - Buy).
-                        pnl = abs(opposite['price'] - filled_order['price']) * filled_order['amount']
 
-                    trade_data = {
-                        'symbol': symbol,
-                        'side': 'LONG',
-                        'entry_price': filled_order['price'],
-                        'amount': filled_order['amount'],
-                        'status': 'OPEN',
-                        'strategy_data': {
-                            'strategy': 'grid_trading',
-                            'grid_level': order_data['level'],
-                            'grid_cycle_id': order_data['grid_cycle_id'],
-                            'sell_order_id': new_order['id'],
-                            'expected_profit': pnl
+                        trade_data = {
+                            'symbol': symbol,
+                            'side': 'LONG',
+                            'entry_price': filled_order['price'],
+                            'amount': filled_order['amount'],
+                            'status': 'OPEN',
+                            'strategy_data': {
+                                'strategy': 'grid_trading',
+                                'grid_level': order_data['level'],
+                                'grid_cycle_id': order_data['grid_cycle_id'],
+                                'sell_order_id': new_order['id'],
+                                'expected_profit': pnl
+                            }
                         }
-                    }
+                        # Update existing cycle
+                        if not self.db.update_trade_by_cycle(order_data['grid_cycle_id'], trade_data):
+                            self.db.log_trade(trade_data)
 
-                    # Try to update existing cycle first
-                    if not self.db.update_trade_by_cycle(order_data['grid_cycle_id'], trade_data):
-                        # Fallback to insert if not found
-                        self.db.log_trade(trade_data)
+                    else:
+                        # VENDA preenchida (TP) -> Ciclo fechou -> Status CLOSED
+                        # 1. Fechar o trade anterior no banco
+                        realized_pnl = (filled_order['price'] - order_data.get('entry_price', filled_order['price'])) * filled_order['amount']
+                        # Fallback for PnL if entry_price missing: estimate from spread
+                        if realized_pnl == 0:
+                             realized_pnl = abs(filled_order['price'] - opposite['price']) * filled_order['amount']
+
+                        close_data = {
+                            'status': 'CLOSED',
+                            'exit_price': filled_order['price'],
+                            'pnl': realized_pnl,
+                            'updated_at': 'now()'
+                        }
+                        self.db.update_trade_by_cycle(order_data['grid_cycle_id'], close_data)
+
+                        # 2. Criar NOVO registro para a ordem de recompra (Grid Infinito)
+                        # Precisamos de um novo ID de ciclo para não misturar com o fechado
+                        new_cycle_id = str(uuid.uuid4())
+
+                        # Atualizar o pending_orders local com o novo ID
+                        self.pending_orders[new_order['id']]['grid_cycle_id'] = new_cycle_id
+
+                        # Inserir novo trade PENDING
+                        new_trade_data = {
+                            'symbol': symbol,
+                            'side': 'LONG',
+                            'entry_price': opposite['price'], # Preço da nova ordem Limit Buy
+                            'amount': opposite['size'],
+                            'status': 'PENDING',
+                            'strategy_data': {
+                                'strategy': 'grid_trading',
+                                'grid_level': opposite['level'],
+                                'grid_cycle_id': new_cycle_id,
+                                'order_id': new_order['id']
+                            }
+                        }
+                        self.db.log_trade(new_trade_data)
+
+                        # Para o log de notificação
+                        pnl = realized_pnl
 
                 except Exception as e:
                     logging.error(f"Failed to log trade update to DB: {e}")
