@@ -26,9 +26,13 @@ class Config:
 
     # Grid Trading Config
     GRID_LEVELS = os.getenv('GRID_LEVELS', '5')
-    GRID_SPACING_PCT = os.getenv('GRID_SPACING_PCT', '0.004')  # 0.4%
-    GRID_PROFIT_PCT = os.getenv('GRID_PROFIT_PCT', '0.004')  # 0.4%
+    GRID_SPACING_PCT = os.getenv('GRID_SPACING_PCT', '0.005')  # 0.5%
+    GRID_PROFIT_PCT = os.getenv('GRID_PROFIT_PCT', '0.005')    # 0.5%
+    GRID_REBALANCE_THRESHOLD = float(os.getenv('GRID_REBALANCE_THRESHOLD', '0.02')) # 2% deviation
     CAPITAL_PER_GRID = os.getenv('CAPITAL_PER_GRID', '10.0')  # $10 per level
+
+    # 3. Risk Management
+    STOP_LOSS_PERCENT = os.getenv('STOP_LOSS_PERCENT', '0.02')  # 2%
     REBALANCE_THRESHOLD = os.getenv('REBALANCE_THRESHOLD', '0.10')  # 10%
 
     @staticmethod

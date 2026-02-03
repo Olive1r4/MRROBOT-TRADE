@@ -104,28 +104,28 @@ class GridStrategy:
         return grid_levels
 
     def should_rebalance(self, current_price: float, grid_range: Tuple[float, float],
-                        threshold: float = 0.10) -> bool:
+                        mid_price: float = None) -> bool:
         """
-        Check if price has moved outside grid range
-
-        Args:
-            current_price: Current market price
-            grid_range: (range_low, range_high)
-            threshold: Percentage outside range to trigger rebalance (default: 10%)
-
-        Returns:
-            True if rebalancing needed
+        Check if rebalancing is needed using Config threshold
         """
+        from src.config import Config
+        threshold = Config.GRID_REBALANCE_THRESHOLD
+
         range_low, range_high = grid_range
-        range_size = range_high - range_low
 
-        # Check if price is outside range + threshold
-        lower_bound = range_low - (range_size * threshold)
-        upper_bound = range_high + (range_size * threshold)
+        # 1. Check Range Breach (Catastrophic failure of grid)
+        # If price is completely outside range, we MUST rebalance
+        if current_price < range_low or current_price > range_high:
+             logging.warning(f"[GRID] Range Breach: Price ${current_price:.6f} outside ${range_low:.6f}-${range_high:.6f}")
+             return True
 
-        if current_price < lower_bound or current_price > upper_bound:
-            logging.warning(f"[GRID] Rebalance needed: Price ${current_price:.4f} outside range ${range_low:.4f}-${range_high:.4f}")
-            return True
+        # 2. Check Center Deviation (Dynamic Drift)
+        # Only if mid_price is provided (tracked state)
+        if mid_price:
+            deviation = abs(current_price - mid_price) / mid_price
+            if deviation > threshold: # e.g. > 2%
+                logging.info(f"[GRID] Deviation Rebalance: Price ${current_price:.6f} drifted {deviation*100:.2f}% from Center ${mid_price:.6f}")
+                return True
 
         return False
 

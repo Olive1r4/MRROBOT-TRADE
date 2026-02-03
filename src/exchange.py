@@ -269,24 +269,22 @@ class Exchange:
             # In a full implementation, we'd track paper orders in memory
             return []
 
-    async def cancel_all_orders(self, symbol: str):
+    async def cancel_all_orders(self, symbol: str, side: str = None):
         """
-        Cancel all open orders for a symbol
-
-        Args:
-            symbol: Trading pair
-
-        Returns:
-            Number of orders cancelled
+        Cancel all open orders for a symbol, optionally filtered by side
         """
         if self.mode == 'LIVE':
             try:
                 orders = await self.get_open_orders(symbol)
                 cancelled = 0
                 for order in orders:
+                    # Filter by side if specified (e.g., cancel only 'buy' orders)
+                    if side and order['side'].lower() != side.lower():
+                        continue
+
                     if await self.cancel_order(order['id'], symbol):
                         cancelled += 1
-                logging.info(f"[CANCEL ALL] Cancelled {cancelled} orders for {symbol}")
+                logging.info(f"[CANCEL ALL] Cancelled {cancelled} {side if side else ''} orders for {symbol}")
                 return cancelled
             except Exception as e:
                 logging.error(f"Error cancelling all orders: {e}")

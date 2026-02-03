@@ -147,11 +147,11 @@ class GridTradingBot:
             # This ensures we sync with the current correct grid parameters
             logging.info(f"[GRID SETUP] Canceling existing orders for {symbol} to align with new grid")
 
-            # 1. Update DB functionality FIRST
+            # 1. Update DB functionality FIRST (Mark PENDING entries as CANCELLED)
             self.db.cancel_pending_trades(symbol)
 
-            # 2. Cancel on Exchange
-            await self.exchange.cancel_all_orders(symbol)
+            # 2. Cancel on Exchange - ONLY BUY ORDERS (Preserve SELLS/TPs)
+            await self.exchange.cancel_all_orders(symbol, side='BUY')
 
             # Calculate range
             range_low, range_high, mid_price = self.grid_strategy.calculate_grid_range(candles)
@@ -172,6 +172,7 @@ class GridTradingBot:
             # Store grid state
             self.active_grids[symbol] = {
                 'range': (range_low, range_high),
+                'mid_price': mid_price, # Store for deviation check
                 'levels': grid_levels,
                 'last_rebalance': datetime.now(),
                 'market_settings': market_settings
@@ -247,14 +248,32 @@ class GridTradingBot:
                 return
 
             # Check if rebalancing needed
-            if self.grid_strategy.should_rebalance(current_price, grid_data['range']):
+            # Check if rebalancing needed
+            if self.grid_strategy.should_rebalance(
+                current_price,
+                grid_data['range'],
+                mid_price=grid_data.get('mid_price')
+            ):
                 logging.info(f"[GRID] Rebalancing needed for {symbol}")
-                # Cancel all orders
-                await self.exchange.cancel_all_orders(symbol)
-                # Remove from active grids
+                # 1. Update DB: Cancel old pending trades
+                self.db.cancel_pending_trades(symbol)
+
+                # 2. Exchange: Cancel only BUY orders (keep TPs)
+                await self.exchange.cancel_all_orders(symbol, side='BUY')
+
+                # 3. Clear pending orders tracking locally
+                # We need to filter out orders that were kept (if any) or just clear all BUYs
+                # Since we only cancelled BUY orders, we must preserve SELL (TP) orders in our tracker
+                self.pending_orders = {
+                    k: v for k, v in self.pending_orders.items()
+                    if v['symbol'] != symbol or v['order']['side'].upper() != 'BUY'
+                }
+
+                # 4. Remove from active grids (will trigger re-setup in next loop)
                 del self.active_grids[symbol]
-                # Will be recreated on next cycle
                 return
+
+            # Check open orders (in LIVE mode)
 
             # Check open orders (in LIVE mode)
             if Config.TRADING_MODE == 'LIVE':
