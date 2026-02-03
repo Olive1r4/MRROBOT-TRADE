@@ -19,8 +19,6 @@ jobs:
           script: |
             cd ~/mrrobot-trade
             git pull origin main
-            docker stop mrrobot_trade_bot || true
-            docker rm mrrobot_trade_bot || true
-            docker compose down --remove-orphans
-            docker system prune -f
-            docker compose up -d --build --force-recreate --remove-orphans
+            # Only use up -d --build. Docker Compose handles recreation if needed.
+            # Removing prune/stop/rm to allow CACHING and speed up deploys.
+            docker compose up -d --build --remove-orphans

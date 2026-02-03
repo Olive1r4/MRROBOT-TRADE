@@ -135,6 +135,11 @@ class GridTradingBot:
             # Cancel existing orders to start fresh (avoids duplication and margin issues)
             # This ensures we sync with the current correct grid parameters
             logging.info(f"[GRID SETUP] Canceling existing orders for {symbol} to align with new grid")
+
+            # 1. Update DB functionality FIRST
+            self.db.cancel_pending_trades(symbol)
+
+            # 2. Cancel on Exchange
             await self.exchange.cancel_all_orders(symbol)
 
             # Calculate range

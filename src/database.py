@@ -37,6 +37,20 @@ class Database:
             logging.error(f"Error updating trade: {e}")
             return None
 
+    def cancel_pending_trades(self, symbol: str):
+        try:
+            db = self.get_client()
+            # Update all 'PENDING' trades for this symbol to 'CANCELLED'
+            response = db.table('trades_mrrobot')\
+                .update({'status': 'CANCELLED'})\
+                .eq('symbol', symbol)\
+                .eq('status', 'PENDING')\
+                .execute()
+            return response
+        except Exception as e:
+            logging.error(f"Error cancelling pending trades for {symbol}: {e}")
+            return None
+
     def log_wallet(self, wallet_data: dict):
         try:
             db = self.get_client()
