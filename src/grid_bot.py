@@ -351,7 +351,12 @@ class GridTradingBot:
 
             # In PAPER mode, we'd simulate fills based on price crossing levels
             # For now, just log monitoring
-            logging.info(f"[GRID] Monitoring {symbol} | Price: ${current_price:.4f} | Pending Orders: {len([o for o in self.pending_orders.values() if o['symbol'] == symbol])}")
+            # Calculate metrics for logging
+            symbol_orders = [o for o in self.pending_orders.values() if o['symbol'] == symbol]
+            active_buys = len([o for o in symbol_orders if o['order']['side'].lower() == 'buy'])
+            active_sells = len([o for o in symbol_orders if o['order']['side'].lower() == 'sell'])
+
+            logging.info(f"[GRID] Monitoring {symbol} | Price: ${current_price:.4f} | Open Positions: {active_sells} | Pending Buys: {active_buys}")
 
         except Exception as e:
             logging.error(f"[GRID] Error monitoring grid for {symbol}: {e}")
