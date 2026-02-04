@@ -40,6 +40,12 @@ class Config:
     BTC_FILTER_THRESHOLD = float(os.getenv('BTC_FILTER_THRESHOLD', '-0.03'))  # -3%
     BTC_FILTER_TIMEFRAME = os.getenv('BTC_FILTER_TIMEFRAME', '1h')
 
+    # RSI Filter (Prevent buying at tops)
+    RSI_FILTER_ENABLED = os.getenv('RSI_FILTER_ENABLED', 'false').lower() == 'true'
+    RSI_FILTER_THRESHOLD = float(os.getenv('RSI_FILTER_THRESHOLD', '70'))
+    RSI_FILTER_TIMEFRAME = os.getenv('RSI_FILTER_TIMEFRAME', '1h')
+    RSI_FILTER_PERIOD = int(os.getenv('RSI_FILTER_PERIOD', '14'))
+
     @staticmethod
     def validate():
         if Config.TRADING_MODE == 'LIVE':

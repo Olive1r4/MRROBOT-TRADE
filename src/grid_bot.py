@@ -102,6 +102,90 @@ class GridTradingBot:
             logging.error(f"[BTC FILTER] Error checking BTC trend: {e}")
             return True  # Fail-safe: allow trading if check fails
 
+    def calculate_rsi(self, candles, period=14):
+        """
+        Calculate RSI (Relative Strength Index) manually
+        """
+        try:
+            closes = [float(c[4]) for c in candles]  # Close prices
+
+            if len(closes) < period + 1:
+                return None
+
+            # Calculate price changes
+            deltas = [closes[i] - closes[i-1] for i in range(1, len(closes))]
+
+            # Separate gains and losses
+            gains = [d if d > 0 else 0 for d in deltas]
+            losses = [-d if d < 0 else 0 for d in deltas]
+
+            # Calculate average gain/loss (using EMA for standard RSI)
+            avg_gain = sum(gains[:period]) / period
+            avg_loss = sum(losses[:period]) / period
+
+            # Calculate RSI using first smoothed values
+            for i in range(period, len(gains)):
+                avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+                avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+
+            if avg_loss == 0:
+                return 100  # No losses = maximum RSI
+
+            rs = avg_gain / avg_loss
+            rsi = 100 - (100 / (1 + rs))
+
+            return rsi
+
+        except Exception as e:
+            logging.error(f"[RSI] Error calculating RSI: {e}")
+            return None
+
+    async def check_rsi_filter(self, symbol: str) -> bool:
+        """
+        Check if symbol's RSI is overbought (safety filter)
+        Returns False if RSI is too high (block new buys)
+        """
+        if not Config.RSI_FILTER_ENABLED:
+            return True  # Filter disabled, always allow
+
+        try:
+            # Fetch candles for RSI calculation
+            # Need period + 1 candles minimum
+            limit = Config.RSI_FILTER_PERIOD + 10  # Extra buffer
+
+            candles = await self.exchange.get_candles(symbol, limit=limit, timeframe=Config.RSI_FILTER_TIMEFRAME)
+            if not candles or len(candles) < Config.RSI_FILTER_PERIOD + 1:
+                logging.warning(f"[RSI FILTER] Could not fetch enough data for {symbol}, allowing trades (fail-safe)")
+                return True
+
+            # Calculate RSI
+            rsi = self.calculate_rsi(candles, period=Config.RSI_FILTER_PERIOD)
+
+            if rsi is None:
+                logging.warning(f"[RSI FILTER] Could not calculate RSI for {symbol}, allowing trades (fail-safe)")
+                return True
+
+            # Check if overbought
+            if rsi > Config.RSI_FILTER_THRESHOLD:
+                logging.warning(
+                    f"🔥 [RSI FILTER] {symbol} is overbought (RSI={rsi:.1f} > {Config.RSI_FILTER_THRESHOLD}). "
+                    f"BLOCKING new BUY orders to avoid buying at top."
+                )
+                await self.send_notification(
+                    f"🔥 **RSI Overbought Protection**\n\n"
+                    f"{symbol}: RSI {rsi:.1f} (threshold: {Config.RSI_FILTER_THRESHOLD})\n"
+                    f"Status: New BUY orders BLOCKED"
+                )
+                return False
+
+            # All good
+            logging.info(f"[RSI FILTER] {symbol} RSI OK ({rsi:.1f})")
+            return True
+
+        except Exception as e:
+            logging.error(f"[RSI FILTER] Error checking RSI for {symbol}: {e}")
+            return True  # Fail-safe: allow trading if check fails
+
 
     async def run(self):
         # Initial Wallet Check
@@ -279,9 +363,16 @@ class GridTradingBot:
                 btc_ok = await self.check_btc_trend()
                 if not btc_ok:
                     logging.warning(f"[GRID SETUP] Skipping new BUY orders for {symbol} due to BTC crash protection")
-                    # Update grid as monitoring only
                     logging.info(f"[GRID SETUP] Grid updated for {symbol} (Monitoring Only - BTC crash protection active)")
                     return
+
+                # RSI Overbought Protection: Don't create new buys if symbol is overbought
+                rsi_ok = await self.check_rsi_filter(symbol)
+                if not rsi_ok:
+                    logging.warning(f"[GRID SETUP] Skipping new BUY orders for {symbol} due to RSI overbought protection")
+                    logging.info(f"[GRID SETUP] Grid updated for {symbol} (Monitoring Only - RSI overbought protection active)")
+                    return
+
 
             current_price = await self.exchange.get_current_price(symbol)
 
