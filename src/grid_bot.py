@@ -144,9 +144,9 @@ class GridTradingBot:
                 return
 
             # Set leverage for this symbol (Binance stores leverage per-pair)
-            # This ensures all new orders use the configured leverage
+            # This ensures all new orders use the configured leverage from database
             try:
-                leverage = int(Config.LEVERAGE) if hasattr(Config, 'LEVERAGE') else 5
+                leverage = int(market_settings.get('leverage', 5))  # Default to 5x if not in DB
                 await self.exchange.set_leverage(leverage, symbol)
                 logging.info(f"[GRID SETUP] Set leverage to {leverage}x for {symbol}")
             except Exception as e:
