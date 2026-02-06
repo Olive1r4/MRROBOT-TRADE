@@ -40,10 +40,10 @@ class Config:
     BTC_FILTER_THRESHOLD = float(os.getenv('BTC_FILTER_THRESHOLD', '-0.03'))  # -3%
     BTC_FILTER_TIMEFRAME = os.getenv('BTC_FILTER_TIMEFRAME', '1h')
 
-    # RSI Filter (Smart entry/exit zones)
+    # RSI Filter (Smart entry zone - buy only in healthy range)
     RSI_FILTER_ENABLED = os.getenv('RSI_FILTER_ENABLED', 'false').lower() == 'true'
-    RSI_FILTER_THRESHOLD = float(os.getenv('RSI_FILTER_THRESHOLD', '70'))  # Upper bound
-    RSI_BUY_THRESHOLD = float(os.getenv('RSI_BUY_THRESHOLD', '50'))  # Lower bound for entry
+    RSI_BUY_LOW = float(os.getenv('RSI_BUY_LOW', '35'))  # Lower bound for entry
+    RSI_BUY_HIGH = float(os.getenv('RSI_BUY_HIGH', '60'))  # Upper bound for entry
     RSI_FILTER_TIMEFRAME = os.getenv('RSI_FILTER_TIMEFRAME', '15m')
     RSI_FILTER_PERIOD = int(os.getenv('RSI_FILTER_PERIOD', '14'))
 

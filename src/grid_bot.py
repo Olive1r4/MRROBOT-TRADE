@@ -165,34 +165,35 @@ class GridTradingBot:
                 logging.warning(f"[RSI FILTER] Could not calculate RSI for {symbol}, allowing trades (fail-safe)")
                 return True
 
-            # Check if RSI is too LOW for entry (wait for better entry point)
-            if rsi > Config.RSI_BUY_THRESHOLD:
+            # Check if RSI is in healthy buy zone (35 < RSI < 60)
+            if rsi < Config.RSI_BUY_LOW:
                 logging.warning(
-                    f"📊 [RSI FILTER] {symbol} RSI too high for entry (RSI={rsi:.1f} > {Config.RSI_BUY_THRESHOLD}). "
-                    f"Waiting for dip to buy cheaper."
+                    f"📉 [RSI FILTER] {symbol} RSI too low (RSI={rsi:.1f} < {Config.RSI_BUY_LOW}). "
+                    f"Possible falling knife - waiting for stabilization."
                 )
                 await self.send_notification(
-                    f"📊 **RSI Entry Filter**\n\n"
-                    f"{symbol}: RSI {rsi:.1f} (buy threshold: <{Config.RSI_BUY_THRESHOLD})\n"
-                    f"Status: Waiting for price dip"
+                    f"📉 **RSI Oversold Warning**\n\n"
+                    f"{symbol}: RSI {rsi:.1f}\n"
+                    f"Zone: Below {Config.RSI_BUY_LOW} (oversold)\n"
+                    f"Status: Waiting for recovery"
                 )
                 return False
 
-            # Check if overbought (extreme zone)
-            if rsi > Config.RSI_FILTER_THRESHOLD:
+            if rsi > Config.RSI_BUY_HIGH:
                 logging.warning(
-                    f"🔥 [RSI FILTER] {symbol} is overbought (RSI={rsi:.1f} > {Config.RSI_FILTER_THRESHOLD}). "
-                    f"BLOCKING new BUY orders to avoid buying at top."
+                    f"📈 [RSI FILTER] {symbol} RSI too high (RSI={rsi:.1f} > {Config.RSI_BUY_HIGH}). "
+                    f"Getting expensive - waiting for better entry."
                 )
                 await self.send_notification(
-                    f"🔥 **RSI Overbought Protection**\n\n"
-                    f"{symbol}: RSI {rsi:.1f} (threshold: {Config.RSI_FILTER_THRESHOLD})\n"
-                    f"Status: New BUY orders BLOCKED"
+                    f"📈 **RSI Entry Filter**\n\n"
+                    f"{symbol}: RSI {rsi:.1f}\n"
+                    f"Zone: Above {Config.RSI_BUY_HIGH} (getting overbought)\n"
+                    f"Status: Waiting for pullback"
                 )
                 return False
 
-            # All good - RSI in buyable zone
-            logging.info(f"[RSI FILTER] {symbol} RSI OK ({rsi:.1f}) - Good entry zone")
+            # RSI in healthy zone - good to buy
+            logging.info(f"[RSI FILTER] {symbol} RSI in buy zone ({rsi:.1f}) - Healthy entry")
             return True
 
         except Exception as e:
