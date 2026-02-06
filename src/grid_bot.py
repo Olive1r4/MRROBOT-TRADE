@@ -171,12 +171,7 @@ class GridTradingBot:
                     f"📉 [RSI FILTER] {symbol} RSI too low (RSI={rsi:.1f} < {Config.RSI_BUY_LOW}). "
                     f"Possible falling knife - waiting for stabilization."
                 )
-                await self.send_notification(
-                    f"📉 **RSI Oversold Warning**\n\n"
-                    f"{symbol}: RSI {rsi:.1f}\n"
-                    f"Zone: Below {Config.RSI_BUY_LOW} (oversold)\n"
-                    f"Status: Waiting for recovery"
-                )
+                # No notification to avoid spam
                 return False
 
             if rsi > Config.RSI_BUY_HIGH:
@@ -184,13 +179,9 @@ class GridTradingBot:
                     f"📈 [RSI FILTER] {symbol} RSI too high (RSI={rsi:.1f} > {Config.RSI_BUY_HIGH}). "
                     f"Getting expensive - waiting for better entry."
                 )
-                await self.send_notification(
-                    f"📈 **RSI Entry Filter**\n\n"
-                    f"{symbol}: RSI {rsi:.1f}\n"
-                    f"Zone: Above {Config.RSI_BUY_HIGH} (getting overbought)\n"
-                    f"Status: Waiting for pullback"
-                )
+                # No notification to avoid spam
                 return False
+
 
             # RSI in healthy zone - good to buy
             logging.info(f"[RSI FILTER] {symbol} RSI in buy zone ({rsi:.1f}) - Healthy entry")
@@ -650,6 +641,18 @@ class GridTradingBot:
                             'updated_at': 'now()'
                         }
                         self.db.update_trade_by_cycle(order_data['grid_cycle_id'], close_data)
+
+                        # Send profit notification 💰
+                        entry_price = order_data.get('entry_price', filled_order['price'])
+                        profit_pct = (realized_pnl / (entry_price * filled_order['amount'])) * 100 if entry_price > 0 else 0
+                        await self.send_notification(
+                            f"💰 **LUCRO REALIZADO!**\n\n"
+                            f"🪙 {symbol}\n"
+                            f"💵 Lucro: ${realized_pnl:.2f} USDT\n"
+                            f"📊 Retorno: {profit_pct:.2f}%\n"
+                            f"📈 Entrada: ${entry_price:.4f}\n"
+                            f"📉 Saída: ${filled_order['price']:.4f}"
+                        )
 
                         # 2. Criar NOVO registro para a ordem de recompra (Grid Infinito)
                         # Precisamos de um novo ID de ciclo para não misturar com o fechado
