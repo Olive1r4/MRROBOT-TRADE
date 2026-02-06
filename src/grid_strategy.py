@@ -133,6 +133,39 @@ class GridStrategy:
 
         return False
 
+    def check_range_stop(self, current_price: float, range_low: float) -> bool:
+        """
+        Check if price has dropped significantly below range_low (Dynamic Range Adjustment)
+
+        This is NOT a traditional stop-loss (doesn't close positions).
+        Instead, it signals that the range should be recalculated downward.
+
+        Args:
+            current_price: Current market price
+            range_low: Bottom of current grid range
+
+        Returns:
+            True if price dropped >= threshold below range_low (needs recalculation)
+        """
+        from src.config import Config
+
+        if not Config.RANGE_STOP_ENABLED:
+            return False
+
+        # Calculate how far below range_low we are
+        drop_pct = (range_low - current_price) / range_low
+
+        if drop_pct >= Config.RANGE_STOP_THRESHOLD:
+            logging.warning(
+                f"📉 [RANGE STOP] Price ${current_price:.4f} is {drop_pct*100:.2f}% below "
+                f"range_low ${range_low:.4f} (threshold: {Config.RANGE_STOP_THRESHOLD*100:.1f}%). "
+                f"Dynamic range adjustment needed."
+            )
+            return True
+
+        return False
+
+
     def calculate_opposite_order(self, filled_order: Dict) -> Dict:
         """
         Calculate opposite order after a grid order is filled

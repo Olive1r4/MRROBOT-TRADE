@@ -40,11 +40,16 @@ class Config:
     BTC_FILTER_THRESHOLD = float(os.getenv('BTC_FILTER_THRESHOLD', '-0.03'))  # -3%
     BTC_FILTER_TIMEFRAME = os.getenv('BTC_FILTER_TIMEFRAME', '1h')
 
-    # RSI Filter (Prevent buying at tops)
+    # RSI Filter (Smart entry/exit zones)
     RSI_FILTER_ENABLED = os.getenv('RSI_FILTER_ENABLED', 'false').lower() == 'true'
-    RSI_FILTER_THRESHOLD = float(os.getenv('RSI_FILTER_THRESHOLD', '70'))
-    RSI_FILTER_TIMEFRAME = os.getenv('RSI_FILTER_TIMEFRAME', '1h')
+    RSI_FILTER_THRESHOLD = float(os.getenv('RSI_FILTER_THRESHOLD', '70'))  # Upper bound
+    RSI_BUY_THRESHOLD = float(os.getenv('RSI_BUY_THRESHOLD', '50'))  # Lower bound for entry
+    RSI_FILTER_TIMEFRAME = os.getenv('RSI_FILTER_TIMEFRAME', '15m')
     RSI_FILTER_PERIOD = int(os.getenv('RSI_FILTER_PERIOD', '14'))
+
+    # Dynamic Range Adjustment (Stop Loss Alternative)
+    RANGE_STOP_ENABLED = os.getenv('RANGE_STOP_ENABLED', 'false').lower() == 'true'
+    RANGE_STOP_THRESHOLD = float(os.getenv('RANGE_STOP_THRESHOLD', '0.05'))  # 5%
 
     @staticmethod
     def validate():

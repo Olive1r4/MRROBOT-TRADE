@@ -165,7 +165,20 @@ class GridTradingBot:
                 logging.warning(f"[RSI FILTER] Could not calculate RSI for {symbol}, allowing trades (fail-safe)")
                 return True
 
-            # Check if overbought
+            # Check if RSI is too LOW for entry (wait for better entry point)
+            if rsi > Config.RSI_BUY_THRESHOLD:
+                logging.warning(
+                    f"📊 [RSI FILTER] {symbol} RSI too high for entry (RSI={rsi:.1f} > {Config.RSI_BUY_THRESHOLD}). "
+                    f"Waiting for dip to buy cheaper."
+                )
+                await self.send_notification(
+                    f"📊 **RSI Entry Filter**\n\n"
+                    f"{symbol}: RSI {rsi:.1f} (buy threshold: <{Config.RSI_BUY_THRESHOLD})\n"
+                    f"Status: Waiting for price dip"
+                )
+                return False
+
+            # Check if overbought (extreme zone)
             if rsi > Config.RSI_FILTER_THRESHOLD:
                 logging.warning(
                     f"🔥 [RSI FILTER] {symbol} is overbought (RSI={rsi:.1f} > {Config.RSI_FILTER_THRESHOLD}). "
@@ -178,8 +191,8 @@ class GridTradingBot:
                 )
                 return False
 
-            # All good
-            logging.info(f"[RSI FILTER] {symbol} RSI OK ({rsi:.1f})")
+            # All good - RSI in buyable zone
+            logging.info(f"[RSI FILTER] {symbol} RSI OK ({rsi:.1f}) - Good entry zone")
             return True
 
         except Exception as e:
@@ -457,8 +470,39 @@ class GridTradingBot:
             if not current_price:
                 return
 
-            # Check if rebalancing needed
-            # Check if rebalancing needed
+            # PRIORITY CHECK: Dynamic Range Stop (5% below range_low)
+            # This triggers recalculation without closing positions
+            range_low, range_high = grid_data['range']
+            if self.grid_strategy.check_range_stop(current_price, range_low):
+                logging.warning(f"[GRID] Dynamic Range Adjustment triggered for {symbol}")
+
+                # Notify user
+                await self.send_notification(
+                    f"📉 **Dynamic Range Adjustment**\n\n"
+                    f"{symbol}: Price ${current_price:.4f}\n"
+                    f"Range Low: ${range_low:.4f}\n"
+                    f"Drop: {((range_low - current_price) / range_low * 100):.2f}%\n\n"
+                    f"Action: Recalculating grid to new range\n"
+                    f"Positions: Kept open (waiting for recovery)"
+                )
+
+                # 1. Update DB: Cancel old pending trades
+                self.db.cancel_pending_trades(symbol)
+
+                # 2. Exchange: Cancel only BUY orders (keep TPs)
+                await self.exchange.cancel_all_orders(symbol, side='BUY')
+
+                # 3. Clear pending BUY orders from tracking
+                self.pending_orders = {
+                    k: v for k, v in self.pending_orders.items()
+                    if v['symbol'] != symbol or v['order']['side'].upper() != 'BUY'
+                }
+
+                # 4. Remove from active grids (will trigger re-setup with new range)
+                del self.active_grids[symbol]
+                return
+
+            # Check if rebalancing needed (normal drift)
             if self.grid_strategy.should_rebalance(
                 current_price,
                 grid_data['range'],
@@ -482,6 +526,7 @@ class GridTradingBot:
                 # 4. Remove from active grids (will trigger re-setup in next loop)
                 del self.active_grids[symbol]
                 return
+
 
             # Check open orders (in LIVE mode)
 
