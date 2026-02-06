@@ -559,7 +559,15 @@ class GridTradingBot:
             active_buys = len([o for o in symbol_orders if o['order']['side'].lower() == 'buy'])
             active_sells = len([o for o in symbol_orders if o['order']['side'].lower() == 'sell'])
 
+            # Auto-cleanup: If no positions and no pending orders, remove from active_grids
+            # This allows the bot to re-run setup_grid (with RSI/BTC checks) on next cycle
+            if active_sells == 0 and active_buys == 0:
+                logging.info(f"[GRID] {symbol} has no open positions or pending orders. Removing from active grids for fresh setup.")
+                del self.active_grids[symbol]
+                return  # Exit early, next cycle will call setup_grid()
+
             logging.info(f"[GRID] Monitoring {symbol} | Price: ${current_price:.4f} | Open Positions: {active_sells} | Pending Buys: {active_buys}")
+
 
         except Exception as e:
             logging.error(f"[GRID] Error monitoring grid for {symbol}: {e}")
