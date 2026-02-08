@@ -253,6 +253,15 @@ class GridTradingBot:
                         if stop_buy:
                             # Count remaining sells
                             symbol_orders = [o for o in self.pending_orders.values() if o['symbol'] == symbol]
+                            if not symbol_orders:
+                                try:
+                                    open_orders = await self.exchange.get_open_orders(symbol)
+                                    if open_orders:
+                                        for order in open_orders:
+                                            if order['id'] not in self.pending_orders:
+                                                self.pending_orders[order['id']] = {'symbol': symbol, 'order': order, 'grid_cycle_id': None}
+                                        symbol_orders = [o for o in self.pending_orders.values() if o['symbol'] == symbol]
+                                except Exception as e: logging.error(f'Error syncing {symbol}: {e}')
                             active_sells = len([o for o in symbol_orders if o['order']['side'].lower() == 'sell'])
 
                             logging.info(f"[STOP BUY] {symbol} (stop_buy=true). Monitoring {active_sells} existing sells. No new grids.")
@@ -474,6 +483,15 @@ class GridTradingBot:
             if stop_buy:
                 # Count remaining sells
                 symbol_orders = [o for o in self.pending_orders.values() if o['symbol'] == symbol]
+                if not symbol_orders:
+                    try:
+                        open_orders = await self.exchange.get_open_orders(symbol)
+                        if open_orders:
+                            for order in open_orders:
+                                if order['id'] not in self.pending_orders:
+                                    self.pending_orders[order['id']] = {'symbol': symbol, 'order': order, 'grid_cycle_id': None}
+                            symbol_orders = [o for o in self.pending_orders.values() if o['symbol'] == symbol]
+                    except Exception as e: logging.error(f'Error syncing {symbol}: {e}')
                 active_sells = len([o for o in symbol_orders if o['order']['side'].lower() == 'sell'])
 
                 logging.info(f"[STOP BUY] {symbol} (stop_buy=true). Monitoring {active_sells} existing sells. No new buys.")
@@ -587,6 +605,15 @@ class GridTradingBot:
             # For now, just log monitoring
             # Calculate metrics for logging
             symbol_orders = [o for o in self.pending_orders.values() if o['symbol'] == symbol]
+            if not symbol_orders:
+                try:
+                    open_orders = await self.exchange.get_open_orders(symbol)
+                    if open_orders:
+                        for order in open_orders:
+                            if order['id'] not in self.pending_orders:
+                                self.pending_orders[order['id']] = {'symbol': symbol, 'order': order, 'grid_cycle_id': None}
+                        symbol_orders = [o for o in self.pending_orders.values() if o['symbol'] == symbol]
+                except Exception as e: logging.error(f'Error syncing {symbol}: {e}')
             active_buys = len([o for o in symbol_orders if o['order']['side'].lower() == 'buy'])
             active_sells = len([o for o in symbol_orders if o['order']['side'].lower() == 'sell'])
 
