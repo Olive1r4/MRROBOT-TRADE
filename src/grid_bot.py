@@ -638,12 +638,20 @@ class GridTradingBot:
             filled_order = order_data['order']
             symbol = order_data['symbol']
 
+            # Fallback for synched orders (missing level)
+            grid_level = order_data.get('level')
+            if grid_level is None:
+                # Try to fetch from DB using order ID (assuming it might be stored)
+                # Or just default to 1 if it's an orphan order
+                logging.warning(f"[GRID] Order {filled_order['id']} missing 'level'. Using default level 1.")
+                grid_level = 1
+
             # Calculate opposite order
             opposite = self.grid_strategy.calculate_opposite_order({
                 'side': filled_order['side'].upper(),
                 'price': filled_order['price'],
                 'size': filled_order['amount'],
-                'level': order_data['level']
+                'level': grid_level
             })
 
             # Create opposite limit order
