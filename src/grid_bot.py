@@ -39,6 +39,8 @@ class GridTradingBot:
         self.pending_orders = {}  # {order_id: order_data}
         self.completed_cycles = []  # Track completed buy-sell cycles
 
+        self.last_sync_time = 0
+
         self.tg_bot = None
 
         # Add Supabase Error Handler
@@ -192,6 +194,74 @@ class GridTradingBot:
             return True  # Fail-safe: allow trading if check fails
 
 
+    async def sync_orphaned_orders(self):
+        """
+        Sync DB OPEN trades with Exchange Open Orders to detect and close orphans.
+        Runs every 15 minutes.
+        """
+        try:
+            now = datetime.now().timestamp()
+            if now - self.last_sync_time < 900: # 15 min
+                return
+
+            logging.info("[SYNC] Starting Orphan Check...")
+            self.last_sync_time = now
+
+            active_markets = self.db.get_active_markets()
+            for market in active_markets:
+                symbol = market['symbol']
+
+                # 1. Fetch DB OPEN trades
+                db_trades = self.db.get_open_trades(symbol)
+                if not db_trades:
+                    continue
+
+                # 2. Fetch Exchange Open Orders
+                binance_orders = await self.exchange.get_open_orders(symbol)
+                if binance_orders is None:
+                    continue
+
+                # 3. Match Logic (Greedy by Amount)
+                binance_pool = list(binance_orders)
+                orphans = []
+
+                for trade in db_trades:
+                    match = None
+                    try:
+                        trade_amt = float(trade['amount'])
+
+                        for bo in binance_pool:
+                            # Match by Amount (0.5% tolerance for float drift)
+                            if abs(float(bo['amount']) - trade_amt) < (trade_amt * 0.005):
+                                match = bo
+                                break
+                    except: pass
+
+                    if match:
+                        binance_pool.remove(match)
+                    else:
+                        orphans.append(trade)
+
+                # 4. Fix Orphans
+                for orphan in orphans:
+                    logging.warning(f"[SYNC] Orphan trade found: {orphan['id']} ({symbol}). Closing in DB.")
+
+                    strat_data = orphan.get('strategy_data') or {}
+                    # JSONB update structure depends on DB content, assume dict
+                    if not isinstance(strat_data, dict): strat_data = {}
+
+                    strat_data['exit_reason'] = 'Auto-Sync: Missing Binance Order'
+
+                    self.db.update_trade(orphan['id'], {
+                        'status': 'CLOSED',
+                        'updated_at': 'now()',
+                        'pnl': 0,
+                        'strategy_data': strat_data
+                    })
+
+        except Exception as e:
+            logging.error(f"[SYNC] Error: {e}")
+
     async def run(self):
         # Initial Wallet Check
         balance_info = await self.exchange.get_balance()
@@ -234,6 +304,9 @@ class GridTradingBot:
                     })
                 except Exception as e:
                     logging.error(f"Error updating wallet balance: {e}")
+
+                # 0. System Sync (Orphan Check)
+                await self.sync_orphaned_orders()
 
                 # 1. Get active markets
                 active_markets = self.db.get_active_markets()
