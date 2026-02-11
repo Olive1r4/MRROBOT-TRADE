@@ -514,6 +514,7 @@ class GridTradingBot:
                                 'entry_price': level['price'],
                                 'amount': order['amount'],  # Use actual amount from exchange (handles truncation)
                                 'status': 'PENDING',
+                                'leverage': Config.LEVERAGE,
                                 'strategy_data': {
                                     'strategy': 'grid_trading',
                                     'grid_level': level['level'],
@@ -762,6 +763,7 @@ class GridTradingBot:
                             'entry_price': filled_order['price'],
                             'amount': filled_order['amount'],
                             'status': 'OPEN',
+                            'leverage': Config.LEVERAGE,
                             'strategy_data': {
                                 'strategy': 'grid_trading',
                                 'grid_level': order_data['level'],
@@ -816,6 +818,7 @@ class GridTradingBot:
                             'entry_price': opposite['price'], # Preço da nova ordem Limit Buy
                             'amount': opposite['size'],
                             'status': 'PENDING',
+                            'leverage': Config.LEVERAGE,
                             'strategy_data': {
                                 'strategy': 'grid_trading',
                                 'grid_level': opposite['level'],
