@@ -22,6 +22,7 @@ class Config:
 
     # Strategy
     TIMEFRAME = os.getenv('TIMEFRAME', '15m')
+    LEVERAGE = int(os.getenv('LEVERAGE', '1'))
     INITIAL_PAPER_BALANCE = float(os.getenv('INITIAL_PAPER_BALANCE', 50.0))
 
     # Grid Trading Config
